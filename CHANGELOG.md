@@ -28,3 +28,13 @@
     phanspeed's chmod-before-chown ordering and its 0644 no-owner fallback.
   kast (no daemon — a glue layer) consumes only write_status/read_status for
   its seam; gestalt keeps its XDG+sanitize config (a refactor-pass question).
+
+## 0.2.0 — the update spine (2026-07-20)
+
+- sutra_update.py: the family update spine (UNIFY.md Wave A #1) — one
+  grammar (--check/--json / bare / --auto), one trust chain (SHA256SUMS +
+  SSHSIG vs pinned anchor, fail-closed when armed, loud degrade when inert),
+  dpkg-vs-source install-path detection (no split-brain writes ever),
+  three consent tiers with auto honored only when armed. Vendored beside
+  sutra.py with its own drift anchor (vendor.sh carries both).
+- tests/unit_update.py: offline trust-chain proof with throwaway keys.

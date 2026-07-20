@@ -9,6 +9,7 @@ ROOT=$(pwd)
 
 # 1. pure-helper unit tests, with sutra importable from the repo root
 PYTHONPATH="$ROOT" python3 tests/unit.py
+PYTHONPATH="$ROOT" python3 tests/unit_update.py
 
 # 2. stage the vendored layout: sutra.py + toy_daemon.py side by side, run the
 #    daemon from there with NO path tricks — proves `import sutra` as a sibling
