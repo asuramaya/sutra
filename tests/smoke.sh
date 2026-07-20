@@ -11,6 +11,17 @@ ROOT=$(pwd)
 PYTHONPATH="$ROOT" python3 tests/unit.py
 PYTHONPATH="$ROOT" python3 tests/unit_update.py
 
+# 1b. pill.js syntax gate: a parse error in the commons bricks every pill's
+# extension at load, so catch it here. node parses the module without
+# resolving its gi://gnome-shell imports (which only exist in-shell —
+# the extension itself is the runtime test, verified live per adoption).
+if command -v node >/dev/null 2>&1; then
+    node --input-type=module --check < pill.js
+    echo "pill.js: syntax ok (node --check)"
+else
+    echo "pill.js: node not installed, syntax gate skipped"
+fi
+
 # 2. stage the vendored layout: sutra.py + toy_daemon.py side by side, run the
 #    daemon from there with NO path tricks — proves `import sutra` as a sibling
 RD=$(mktemp -d)

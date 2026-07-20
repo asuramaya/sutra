@@ -38,3 +38,25 @@
   three consent tiers with auto honored only when armed. Vendored beside
   sutra.py with its own drift anchor (vendor.sh carries both).
 - tests/unit_update.py: offline trust-chain proof with throwaway keys.
+
+## 0.3.0 — pill.js, the extension commons (2026-07-20)
+
+- pill.js: the shape every GNOME pill repeats (UNIFY.md Wave A #2), factored
+  from all five extensions — the ByeByte/RAMstein verbatim twins were the
+  seed; coldspot contributed the flush-right list idiom, phanspeed the
+  update surface, gestalt the socket writer. Exports: the family palette +
+  chip/dot styles · isObj/num/esc/fmtBytes · readStatusFile + the 3×poll+5
+  staleness rule · sendCmd (cancellable-aware async socket line) ·
+  row/wrapRow/iconRow/dataRow + the NBSP wrap discipline · notify ·
+  UpdateSurface (version footer + hidden-until-available update row wired to
+  `<pill> update --check --json` and pkexec install — the update spine's
+  pill face) · StatusWatcher (GFileMonitor + fallback tick, or plain
+  polling) · SystemIndicator add/remove boilerplate. Domain stays out by
+  design: ETA horizons, hero ranking, missions and stances are each pill
+  being itself.
+- vendor.sh: optional second arg (the extension dir) lands pill.js +
+  pill.version there — GJS imports siblings only, and the extension dir is
+  what `make pill` ships.
+- smoke: node --input-type=module --check syntax gate on pill.js (a parse
+  error in a shared module bricks every pill's extension at load);
+  soft-skipped when node is absent.
