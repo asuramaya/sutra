@@ -60,3 +60,30 @@
 - smoke: node --input-type=module --check syntax gate on pill.js (a parse
   error in a shared module bricks every pill's extension at load);
   soft-skipped when node is absent.
+
+## 0.4.0 — the health helper (2026-07-20)
+
+- `check_health(status_path, socket_path)`: the two-check vitals verdict
+  every healthcheck bin repeated by hand (UNIFY.md Wave A #3) — factored
+  from ByeByte's and RAMstein's near-identical originals. Freshness judged
+  against the daemon's OWN declared `poll_interval` (never a magic number),
+  same 3x+5s slack as pill.js's `isStale` so a stale status reads
+  identically from a CLI healthcheck and a GNOME pill; then a `ping` over
+  the control socket confirms the daemon is alive-and-answering, not just
+  alive-on-disk. Returns `(healthy, reason, info)` — passive by design, it
+  renders a verdict and never restarts anything (that stays each pill's
+  call, e.g. systemd's `Restart=`). phanspeed's active-restart script and
+  kast's domain-specific systemd-drift check are correctly out of scope —
+  each pill's own healthcheck bin becomes a thin wrapper over this at its
+  own next release (Wave B), same adoption shape as sutra_update.py/pill.js.
+- Version convention, ruled (Alfred's review of this release): the top-level
+  `VERSION` file is the REPO's release counter (this file, 0.1.0→0.4.0 across
+  four Wave A/B releases) — vendor.sh's `.version` drift anchors always use
+  it. Each module's own in-file constant (`SUTRA_VERSION`, `PILL_JS_VERSION`,
+  `SUTRA_UPDATE_VERSION`) tracks that FILE's own content history instead,
+  independent of the repo counter — it bumps only when that specific file's
+  bytes change, not on every release. sutra.py's content was untouched
+  through 0.2.0/0.3.0 (those releases added sibling files, not lines here),
+  so `SUTRA_VERSION` stayed "0.1.0" until this release's check_health —
+  its first real edit — moved it to "0.2.0". `sutra_update.py` and
+  `pill.js` are unchanged this release, so their constants stay put.

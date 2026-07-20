@@ -8,6 +8,7 @@ import os
 import stat
 import sys
 import tempfile
+import time
 
 import sutra
 
@@ -116,6 +117,51 @@ def test_ewma_rate():
     print("  ewma_rate ok")
 
 
+def test_check_health():
+    with tempfile.TemporaryDirectory() as td:
+        status_path = os.path.join(td, "status.json")
+        sock_path = os.path.join(td, "control.sock")
+
+        # no status.json yet -> unhealthy, names the missing file
+        ok, reason, info = sutra.check_health(status_path, sock_path)
+        assert not ok and "no readable status.json" in reason, reason
+
+        # status.json present but missing ts -> unhealthy
+        sutra.write_status(status_path, {"hello": "world"})
+        ok, reason, info = sutra.check_health(status_path, sock_path)
+        assert not ok and "ts" in reason, reason
+
+        # fresh ts, but a nonsense poll_interval -> unhealthy
+        sutra.write_status(status_path,
+                            {"ts": time.time(), "daemon": {"poll_interval": 0}})
+        ok, reason, info = sutra.check_health(status_path, sock_path)
+        assert not ok and "poll_interval" in reason, reason
+
+        # stale beyond 3x+5s of the declared (or default) poll_interval
+        sutra.write_status(status_path, {"ts": time.time() - 1000})
+        ok, reason, info = sutra.check_health(status_path, sock_path, default_poll=5)
+        assert not ok and "stale" in reason, reason
+        assert info["limit"] == 3 * 5 + 5, info
+
+        # fresh status, but nothing is listening on the socket -> unhealthy
+        sutra.write_status(status_path,
+                            {"ts": time.time(), "daemon": {"poll_interval": 5}})
+        ok, reason, info = sutra.check_health(status_path, sock_path)
+        assert not ok and "ping" in reason, reason
+
+        # fresh status + a real ControlServer answering ping -> healthy
+        srv = sutra.ControlServer(sock_path, sutra.allow_uids({os.getuid()}),
+                                   "9.9.9", lambda cmd, req: None)
+        srv.start()
+        try:
+            ok, reason, info = sutra.check_health(status_path, sock_path)
+            assert ok and reason == "healthy", reason
+            assert info["version"] == "9.9.9", info
+        finally:
+            srv.srv.close()
+    print("  check_health ok")
+
+
 def test_runtime_paths():
     rd, sp, sk = sutra.runtime_paths("SUTRA_TEST_NOPE_ENV", "/run/xyz")
     assert rd == "/run/xyz"
@@ -132,6 +178,7 @@ if __name__ == "__main__":
     test_write_status()
     test_authz()
     test_ewma_rate()
+    test_check_health()
     test_runtime_paths()
     print("UNIT OK")
     sys.exit(0)

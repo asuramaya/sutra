@@ -37,6 +37,7 @@ coordination.)
 | `write_status` | atomic (tmp + rename) status.json write, mode 0640, chowned to the owner only as root. |
 | `ewma_rate` | one EWMA step over a value whose growth is the burn — smoothed bytes/sec for the ETA. |
 | `request` / `read_status` | the client side: one JSON line to the socket, or read status.json when the daemon's gone. For CLIs and healthchecks. |
+| `check_health` | the vitals verdict every healthcheck bin repeated by hand: status.json fresh against the daemon's own `poll_interval` (3x+5s slack, same rule as pill.js's `isStale`), then a socket `ping` confirms it's alive-and-answering. Passive — reports, never restarts. |
 | `runtime_paths` / `stop_event` | the small `main()` scaffolding. |
 
 What sutra does **not** own, on purpose: domain polling, the sqlite index, the

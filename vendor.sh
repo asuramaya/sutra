@@ -17,6 +17,18 @@ set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DEST="${1:?usage: vendor.sh <dest-bin-dir>}"
 
+# Refuse a dirty canonical tree: vendoring WIP would ship an uncommitted,
+# undecided edit into a pill under a version number nobody reviewed or
+# released (custodian lesson #1 — a dirty canonical checkout already leaks
+# into every pill's dev-box `check-sutra` freshness diff; it must not also
+# leak into an actual vendored copy).
+if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1 &&
+   ! git -C "$SRC" diff --quiet -- sutra.py sutra_update.py pill.js; then
+    echo "vendor: canonical sutra has uncommitted changes to a vendored" \
+         "file — commit or stash before vendoring" >&2
+    exit 1
+fi
+
 [ -d "$DEST" ] || { echo "vendor: $DEST is not a directory" >&2; exit 1; }
 ver="$(tr -d '[:space:]' < "$SRC/VERSION")"
 cp "$SRC/sutra.py" "$DEST/sutra.py"
