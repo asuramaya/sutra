@@ -108,10 +108,10 @@
   * `refresh_host_telemetry()` — the guest-side cache half of the dom0
     seam: an injected `fetch` callable's return value gets cached to a
     local status.json via `sutra.write_status`. The actual transport
-    (orchestratord's `host.telemetry` method, over the node-signed
-    guest<->dom0 bridge) is Ra's contract to define — XEN.md-GATED, not
-    built here; a raising or malformed `fetch()` never crashes the caller
-    and never clobbers the existing cache.
+    (orchestratord's `host.telemetry` method, over the guest<->dom0
+    bridge) is Ra's contract to define — XEN.md-GATED, not built here; a
+    raising or malformed `fetch()` never crashes the caller and never
+    clobbers the existing cache.
   * `tests/unit_xen.py`: offline, fake sysfs trees + an injected
     systemd-detect-virt callable, no hardware, no network — plus one live
     check (`is_guest()` on the dev box itself, which really is a Xen
@@ -121,3 +121,17 @@
   instead of `git diff --quiet`; sutra_xen.py's own introduction was the
   case that exposed the gap (a brand-new file has nothing to diff against,
   but everything to refuse).
+
+## 0.5.1 — sutra_xen doc correction (2026-07-21)
+
+- Comment-only fix: 0.5.0's docs described the host-telemetry transport
+  as "node-signed" throughout. Per Ra's preliminary lean (his 904,
+  addendum to the pre-stage order, landed after 0.5.0's build started):
+  read-only telemetry actually rides UNAUTHENTICATED on trusted-local
+  under the connection-trust split — no node key for reads, signing is
+  actuation-only (phanspeed's pin/unpin) and entirely outside this
+  module. `refresh_host_telemetry()`'s stubbed `fetch` models an
+  unauthenticated read, not a signed one. Also noted as a second,
+  separate XEN.md-gated detail: the eventual node key itself is
+  dom0-minted at guest-create, TPM-sealed, dropped at a path the
+  contract will spec — not invented here either. No behavior changed.

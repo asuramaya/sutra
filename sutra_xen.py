@@ -18,14 +18,20 @@
 #      local status.json via sutra.write_status, so a pill reads host truth
 #      the same way it reads its own daemon's status. The TRANSPORT itself
 #      (orchestratord's host.telemetry method, over the guest<->dom0
-#      bridge, node-signed under the connection-trust split) is Ra's
-#      contract to define — XEN.md-GATED, NOT built here. Wire the real
-#      fetch only once that doc lands.
+#      bridge) is Ra's contract to define — XEN.md-GATED, NOT built here.
+#      Per Ra's preliminary lean (his 904, addendum to the pre-stage order):
+#      read-only telemetry rides UNAUTHENTICATED on trusted-local under the
+#      connection-trust split — no node key for reads, signing is
+#      actuation-only (phanspeed's pin/unpin, entirely outside this
+#      module). The eventual node key itself is ALSO contract-gated: dom0
+#      mints it at guest-create, TPM-sealed, dropped at a path XEN.md will
+#      spec — do not invent key handling here either. Wire the real fetch
+#      only once XEN.md lands.
 #
 # stdlib only. Vendored beside sutra.py, always together — imports it
 # directly for write_status rather than reimplementing the atomic write.
 
-SUTRA_XEN_VERSION = "0.1.0"
+SUTRA_XEN_VERSION = "0.1.1"
 
 import os
 import subprocess
@@ -129,12 +135,14 @@ def balloon_headroom_kb(xen_memory_dir=XEN_MEMORY_DIR,
 
 def refresh_host_telemetry(status_path, fetch, owner=None, mode=0o640):
     """Call `fetch()` — XEN.md-GATED; the real one is orchestratord's
-    host.telemetry over the node-signed bridge, injected here as a plain
-    callable so nothing wires the actual crossing before that contract
-    lands — and cache its return value via sutra.write_status. Returns the
-    cached doc, or None (leaving any existing cache untouched) if fetch()
-    raised or returned something that isn't a JSON object: a guest reads
-    STALE host truth over NO truth, never a corrupted one."""
+    host.telemetry over the guest<->dom0 bridge, unauthenticated (reads
+    ride trusted-local under the connection-trust split; signing is
+    actuation-only and out of this module's scope) — injected here as a
+    plain callable so nothing wires the actual crossing before that
+    contract lands. Caches the return value via sutra.write_status.
+    Returns the cached doc, or None (leaving any existing cache untouched)
+    if fetch() raised or returned something that isn't a JSON object: a
+    guest reads STALE host truth over NO truth, never a corrupted one."""
     try:
         doc = fetch()
     except Exception:  # noqa: BLE001 — an unbuilt transport, never crash the caller
