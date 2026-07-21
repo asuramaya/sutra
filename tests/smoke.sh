@@ -100,4 +100,28 @@ assert sutra.request(p, {"cmd": "ping"})["ok"] is True, "daemon died after abuse
 print("hostile ok: garbage/non-object survived, daemon alive")
 PY
 
+# 5. vendor.sh sanity: writes both the integrity (.version) and LAG/DRIFT
+# (.commit) anchors, and the commit anchor matches canonical HEAD exactly.
+# Only meaningful when canonical itself is clean and committed (vendor.sh
+# refuses to run otherwise); skipped rather than failed when it isn't, since
+# a dirty dev tree mid-edit is a normal state for this repo, not a bug.
+VD="$RD/vendor-test"
+mkdir -p "$VD"
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && \
+   [ -z "$(git -C "$ROOT" status --porcelain -- sutra.py sutra_update.py \
+       sutra_xen.py pill.js)" ]; then
+    bash "$ROOT/vendor.sh" "$VD" >/dev/null
+    head_commit=$(git -C "$ROOT" rev-parse HEAD)
+    for f in sutra sutra_update sutra_xen; do
+        [ -s "$VD/$f.version" ] || { echo "SMOKE FAIL: vendor.sh didn't write $f.version"; exit 1; }
+        [ -s "$VD/$f.commit" ] || { echo "SMOKE FAIL: vendor.sh didn't write $f.commit"; exit 1; }
+        got="$(cat "$VD/$f.commit")"
+        [ "$got" = "$head_commit" ] || {
+            echo "SMOKE FAIL: $f.commit ($got) != canonical HEAD ($head_commit)"; exit 1; }
+    done
+    echo "vendor.sh ok: .version + .commit anchors match canonical HEAD ($head_commit)"
+else
+    echo "vendor.sh: canonical tree dirty or not a git checkout, sanity check skipped"
+fi
+
 echo "SMOKE OK"

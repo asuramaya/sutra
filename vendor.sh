@@ -7,14 +7,28 @@
 #               /home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya
 #
 # Writes:  <dest>/sutra.py           the byte-identical module
-#          <dest>/sutra.version      "<version>  <sha256>"  (the drift anchor)
+#          <dest>/sutra.version      "<version>  <sha256>"  (the integrity anchor,
+#                                    UNCHANGED format — existing pills' check-sutra
+#                                    parses $NF for the sha; do not add fields here)
+#          <dest>/sutra.commit       the canonical commit this copy came from (the
+#                                    LAG-vs-DRIFT anchor — a separate file, additive,
+#                                    so an unadopted pill's check-sutra is untouched)
 # and the same pair for sutra_update.py and sutra_xen.py (vendored
 # unconditionally beside it — a pill imports only what it needs), and, when
-# an extension dir is given, pill.js + pill.version there the same way (the
-# extension imports it as a sibling: `import * as Pill from './pill.js'`).
+# an extension dir is given, pill.js + pill.version + pill.commit there the
+# same way (the extension imports it as a sibling: `import * as Pill from
+# './pill.js'`).
 #
-# The pill's CI runs:  sha256sum -c against sutra.version  (integrity), and
-# `make check-sutra` diffs against ../sutra/sutra.py when present (freshness).
+# The pill's CI runs:  sha256sum -c against sutra.version  (integrity, the
+# hard gate — hand-edited or corrupted, always a hard fail); `make
+# check-sutra`'s freshness half, when ../sutra/ is present, reads .commit
+# and asks canonical git which of two things this is: LAG (the recorded
+# commit is an ancestor of canonical HEAD — an old but honest vendor, warn
+# and exit 0) or DRIFT (the recorded commit isn't in canonical's history at
+# all — corrupted anchor or a rewritten canonical history, hard fail).
+# Custodian ruling (supersedes decision 4a2c4c2b's plain HEAD-compare with
+# the LAG/DRIFT split; thread 2ac0a67f carries the reference check-sutra
+# recipe every pill's Wave B adopts at its own next touch).
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DEST="${1:?usage: vendor.sh <dest-bin-dir>}"
@@ -34,9 +48,16 @@ fi
 
 [ -d "$DEST" ] || { echo "vendor: $DEST is not a directory" >&2; exit 1; }
 ver="$(tr -d '[:space:]' < "$SRC/VERSION")"
+# The LAG-vs-DRIFT anchor: which canonical commit this vendor came from.
+# Empty (never written) when canonical isn't a git checkout at all — a
+# pill's check-sutra treats a missing .commit as "freshness unknown", not
+# a failure.
+commit="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
+
 cp "$SRC/sutra.py" "$DEST/sutra.py"
 sha="$(sha256sum "$SRC/sutra.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$sha" > "$DEST/sutra.version"
+[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra.commit"
 echo "vendored sutra $ver -> $DEST/sutra.py"
 echo "  $sha"
 # The update spine vendors the same way, its own drift anchor beside it.
@@ -44,6 +65,7 @@ echo "  $sha"
 cp "$SRC/sutra_update.py" "$DEST/sutra_update.py"
 usha="$(sha256sum "$SRC/sutra_update.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$usha" > "$DEST/sutra_update.version"
+[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra_update.commit"
 echo "vendored sutra_update -> $DEST/sutra_update.py"
 echo "  $usha"
 # Same for the Xen guest-surface reader — vendored unconditionally like the
@@ -51,6 +73,7 @@ echo "  $usha"
 cp "$SRC/sutra_xen.py" "$DEST/sutra_xen.py"
 xsha="$(sha256sum "$SRC/sutra_xen.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$xsha" > "$DEST/sutra_xen.version"
+[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra_xen.commit"
 echo "vendored sutra_xen -> $DEST/sutra_xen.py"
 echo "  $xsha"
 
@@ -63,7 +86,8 @@ if [ $# -ge 2 ]; then
     cp "$SRC/pill.js" "$EXTDIR/pill.js"
     psha="$(sha256sum "$SRC/pill.js" | cut -d' ' -f1)"
     printf '%s  %s\n' "$ver" "$psha" > "$EXTDIR/pill.version"
+    [ -n "$commit" ] && printf '%s\n' "$commit" > "$EXTDIR/pill.commit"
     echo "vendored pill.js -> $EXTDIR/pill.js"
     echo "  $psha"
 fi
-echo "commit the vendored files and .version pairs; do not edit the copies — re-vendor."
+echo "commit the vendored files and .version/.commit pairs; do not edit the copies — re-vendor."

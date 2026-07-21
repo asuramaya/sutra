@@ -158,3 +158,30 @@
   needs either.
 - `SUTRA_VERSION` 0.2.0 → 0.3.0 (its own content changed: the import of
   `subprocess` plus this function).
+
+## 0.7.0 — LAG vs. DRIFT (2026-07-21)
+
+- Custodian ruling, superseding 4a2c4c2b's plain HEAD-compare: 0.6.0's
+  release turned check-sutra red in three already-adopted pills within
+  hours — every one of them pure LAG (an honest vendor from an earlier
+  canonical commit, canonical has since moved on), zero DRIFT (a
+  hand-edited or corrupted copy). A single "differs from canonical"
+  verdict couldn't tell the two apart, so it over-alarmed on the common,
+  harmless case every time sutra ships. `vendor.sh` now writes a second,
+  additive anchor — `<name>.commit`, the canonical commit this copy came
+  from — beside the unchanged `<name>.version` (existing pills' `$NF`
+  sha-parsing stays untouched; nothing new is inserted into that file).
+  The reference `check-sutra` freshness half becomes a three-way read:
+  no `.commit` anchor → freshness unknown (an older vendor, harmless);
+  recorded commit equals canonical HEAD → freshness ok; recorded commit
+  is an ancestor of HEAD (`git merge-base --is-ancestor`) → **LAG**, warn
+  and exit 0; recorded commit isn't in canonical's history at all →
+  **DRIFT**, hard fail. Integrity (the sha256-vs-`.version` check) is
+  unchanged and stays the hard gate regardless. Recipe recorded in
+  osiris (thread 2ac0a67f) for each pill's Wave B adoption at its own
+  next touch — not a big-bang edit across live repos.
+- `tests/smoke.sh` gains a vendor.sh sanity check: runs a real vendor
+  into a scratch dir and asserts every `.version`/`.commit` pair exists
+  and the commit anchor matches canonical HEAD exactly (skipped, not
+  failed, when the canonical tree itself is dirty or not a git
+  checkout).
