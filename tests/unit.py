@@ -5,6 +5,7 @@ path. Assertion failures are the test result; a clean exit prints OK."""
 
 import json
 import os
+import pwd
 import stat
 import sys
 import tempfile
@@ -162,6 +163,50 @@ def test_check_health():
     print("  check_health ok")
 
 
+def test_notify_owner():
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+
+    def boom_run(cmd, **kw):
+        raise FileNotFoundError("no notify-send binary")
+
+    # own session: uid=None -> direct notify-send, no runuser wrapping
+    sutra.notify_owner(None, "TestPill", "hi", "there", run=fake_run)
+    assert calls[-1] == ["notify-send", "-a", "TestPill", "-u", "normal",
+                         "hi", "there"], calls[-1]
+
+    # own session: uid == caller's own uid -> same, direct
+    sutra.notify_owner(os.getuid(), "TestPill", "hi", "there", run=fake_run)
+    assert calls[-1][0] == "notify-send", calls[-1]
+
+    other = 0 if os.getuid() != 0 else 1  # a real, different uid (root/daemon)
+
+    # a different uid, but no session bus present -> silently does nothing
+    before = len(calls)
+    sutra.notify_owner(other, "TestPill", "hi", "there",
+                        bus_path="/nonexistent/bus", run=fake_run)
+    assert len(calls) == before, "must not shell out with no bus present"
+
+    # a different uid, bus present -> runuser-wrapped into that session
+    with tempfile.TemporaryDirectory() as td:
+        bus = os.path.join(td, "bus")
+        open(bus, "w").close()
+        sutra.notify_owner(other, "TestPill", "swept 4K", "reclaimed",
+                           urgency="critical", bus_path=bus, run=fake_run)
+        cmd = calls[-1]
+        name = pwd.getpwuid(other).pw_name
+        assert cmd[:3] == ["runuser", "-u", name], cmd
+        assert f"DBUS_SESSION_BUS_ADDRESS=unix:path={bus}" in cmd, cmd
+        assert cmd[-7:] == ["notify-send", "-a", "TestPill", "-u",
+                            "critical", "swept 4K", "reclaimed"], cmd
+
+    # an unreachable notify-send (or any run failure) never raises
+    sutra.notify_owner(None, "TestPill", "hi", "there", run=boom_run)
+    print("  notify_owner ok")
+
+
 def test_runtime_paths():
     rd, sp, sk = sutra.runtime_paths("SUTRA_TEST_NOPE_ENV", "/run/xyz")
     assert rd == "/run/xyz"
@@ -179,6 +224,7 @@ if __name__ == "__main__":
     test_authz()
     test_ewma_rate()
     test_check_health()
+    test_notify_owner()
     test_runtime_paths()
     print("UNIT OK")
     sys.exit(0)

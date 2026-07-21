@@ -135,3 +135,26 @@
   separate XEN.md-gated detail: the eventual node key itself is
   dom0-minted at guest-create, TPM-sealed, dropped at a path the
   contract will spec — not invented here either. No behavior changed.
+
+## 0.6.0 — notify_owner, the shared notification helper (2026-07-21)
+
+- `notify_owner(uid, app_name, summary, body, urgency="normal")`: best-
+  effort notify-send into the owner's desktop session, absorbed into
+  sutra.py per UNIFY.md's notification spec (row 13). Root-daemon path
+  (uid is someone else's — crosses via `runuser` + that session's bus at
+  `/run/user/<uid>/bus`) is ByeByte's original verbatim; the direct-
+  session path (uid is `None` or already the caller's own) is new, for a
+  user daemon (gestalt) that's already running as its owner. `app_name`
+  is notify-send's `-a` (each pill passes its own name — this is a
+  shared helper serving all of them, not a single pill's constant);
+  `urgency` is `'normal'`/`'critical'` per the spec (update-available and
+  completed auto-actions vs. failsafe events), passed straight through.
+  Silently does nothing if there's no active login session or anything
+  about reaching it fails — a verb's success never depends on whether a
+  toast could be shown, and the caller must already have written the
+  ledger/status entry the toast points at (a toast is a pointer to
+  truth, never the truth itself). `bus_path`/`run` are test-injection
+  seams (default to the real bus path and `subprocess.run`); no pill
+  needs either.
+- `SUTRA_VERSION` 0.2.0 → 0.3.0 (its own content changed: the import of
+  `subprocess` plus this function).
