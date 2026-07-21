@@ -10,6 +10,7 @@ ROOT=$(pwd)
 # 1. pure-helper unit tests, with sutra importable from the repo root
 PYTHONPATH="$ROOT" python3 tests/unit.py
 PYTHONPATH="$ROOT" python3 tests/unit_update.py
+PYTHONPATH="$ROOT" python3 tests/unit_xen.py
 
 # 1b. pill.js syntax gate: a parse error in the commons bricks every pill's
 # extension at load, so catch it here. node parses the module without

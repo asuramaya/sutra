@@ -16,19 +16,25 @@ socket) lands once instead of six times.
 
 ## Cake, and eat it: vendored, not depended-on
 
-sutra is a **single stdlib-only module**. Pills don't `pip install` it and
-don't `Depends:` on it — they **vendor** it: `sutra.py` is copied byte-identical
-into the pill's `bin/`, imported as a sibling of the daemon, and shipped inside
-the pill's own `.deb`. Each pill stays completely self-contained and
-independently installable — the property the family's "merged up to the OS one
-day" constitution rests on — while the code still has one home. A CI hash check
-keeps the copies from drifting; when every pill sits at the same sutra version,
-they share **one hash** — that shared hash is the family's proof they agree on
-the substrate. (If a Debian maintainer ever prefers de-vendoring, the same file
-packages cleanly as `python3-sutra` — but vendored is the default and needs no
+Every file here is **stdlib-only**. Pills don't `pip install` sutra and don't
+`Depends:` on it — they **vendor** it: `sutra.py` (the backbone), plus
+`sutra_update.py` (the update spine) and `sutra_xen.py` (the Xen guest-surface
+reader) alongside it, copied byte-identical into the pill's `bin/`, imported as
+siblings of the daemon, and shipped inside the pill's own `.deb`. A pill
+imports only the ones it needs — the update spine and the Xen reader are
+vendored unconditionally but are dead weight until a pill actually `import`s
+them. Each pill stays completely self-contained and independently installable
+— the property the family's "merged up to the OS one day" constitution rests
+on — while the code still has one home. A CI hash check keeps the copies from
+drifting; when every pill sits at the same sutra version, they share **one
+hash** per file — that shared hash is the family's proof they agree on the
+substrate. (If a Debian maintainer ever prefers de-vendoring, the same files
+package cleanly as `python3-sutra` — but vendored is the default and needs no
 coordination.)
 
 ## What's in it
+
+`sutra.py` — the backbone every pill daemon imports:
 
 | API | what it is |
 |---|---|
@@ -42,6 +48,24 @@ coordination.)
 
 What sutra does **not** own, on purpose: domain polling, the sqlite index, the
 verbs, the pill UI. Those are each pill's organs. sutra is the skeleton.
+
+`sutra_update.py` — the family's update spine (one grammar, one trust chain,
+three consent tiers); a pill collapses its own `<pill>-update` to a thin
+wrapper over `sutra_update.main(...)`. See the module's own docstring for the
+full contract.
+
+`sutra_xen.py` — the Xen guest-surface reader, guest-side pre-stage of the
+Xen adaptation program:
+
+| API | what it is |
+|---|---|
+| `virt_type()` / `is_guest()` | systemd-detect-virt when present (honest report — kvm/docker/etc.), `/proc/xen` + DMI vendor as the xen-or-none fallback. |
+| `balloon_target_kb()` / `balloon_headroom_kb()` | the xen_memory sysfs surface — the hypervisor's granted `target_kb` vs `/proc/meminfo`'s MemTotal; the gap is real (memory not yet onlined), and the ceiling a balloon-aware pill should use. |
+| `refresh_host_telemetry()` | caches an injected `fetch()`'s result to a local status.json via `write_status`. The actual transport (orchestratord's `host.telemetry`, node-signed over the guest↔dom0 bridge) is XEN.md-gated — not built here. |
+
+`pill.js` — the GNOME extension commons (palette, status read + staleness
+rule, socket writer, row helpers, update surface, indicator boilerplate);
+see its own header comment for the full export list.
 
 ## Using it
 

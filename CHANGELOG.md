@@ -87,3 +87,37 @@
   so `SUTRA_VERSION` stayed "0.1.0" until this release's check_health —
   its first real edit — moved it to "0.2.0". `sutra_update.py` and
   `pill.js` are unchanged this release, so their constants stay put.
+
+## 0.5.0 — sutra_xen, the guest-surface reader (2026-07-21)
+
+- `sutra_xen.py`: the guest-side pre-stage of the Xen adaptation program
+  (Ra's dom0-seam doctrine, decision 32b88ff24f87) — vendored beside
+  sutra.py/sutra_update.py, same drift-anchor discipline, always vendored
+  (a pill with no Xen concerns simply doesn't import it). Exactly three
+  things, none of which move when XEN.md lands:
+  * `virt_type()` / `is_guest()` — systemd-detect-virt when present
+    (reported honestly — kvm/docker/etc., not just xen-or-nothing);
+    `/proc/xen` + the DMI vendor string as the fallback when the binary is
+    missing, both guest-only signals, xen-or-none only (the one hypervisor
+    this family's guest seam cares about).
+  * `balloon_target_kb()` / `balloon_headroom_kb()` — the xen_memory sysfs
+    surface (`target_kb` vs `/proc/meminfo`'s MemTotal); the gap is real
+    machinery (memory the balloon driver hasn't onlined yet), not noise —
+    RAMstein's balloon-aware totals need `target_kb` as the ceiling, never
+    MemTotal. Pure guest-local reads, zero contract dependency.
+  * `refresh_host_telemetry()` — the guest-side cache half of the dom0
+    seam: an injected `fetch` callable's return value gets cached to a
+    local status.json via `sutra.write_status`. The actual transport
+    (orchestratord's `host.telemetry` method, over the node-signed
+    guest<->dom0 bridge) is Ra's contract to define — XEN.md-GATED, not
+    built here; a raising or malformed `fetch()` never crashes the caller
+    and never clobbers the existing cache.
+  * `tests/unit_xen.py`: offline, fake sysfs trees + an injected
+    systemd-detect-virt callable, no hardware, no network — plus one live
+    check (`is_guest()` on the dev box itself, which really is a Xen
+    guest).
+- `vendor.sh`'s dirty-tree guard (0.4.0) widened to catch untracked new
+  files, not just modified tracked ones — `git status --porcelain`
+  instead of `git diff --quiet`; sutra_xen.py's own introduction was the
+  case that exposed the gap (a brand-new file has nothing to diff against,
+  but everything to refuse).

@@ -8,8 +8,10 @@
 #
 # Writes:  <dest>/sutra.py           the byte-identical module
 #          <dest>/sutra.version      "<version>  <sha256>"  (the drift anchor)
-# and, when an extension dir is given, pill.js + pill.version there the same
-# way (the extension imports it as a sibling: `import * as Pill from './pill.js'`).
+# and the same pair for sutra_update.py and sutra_xen.py (vendored
+# unconditionally beside it — a pill imports only what it needs), and, when
+# an extension dir is given, pill.js + pill.version there the same way (the
+# extension imports it as a sibling: `import * as Pill from './pill.js'`).
 #
 # The pill's CI runs:  sha256sum -c against sutra.version  (integrity), and
 # `make check-sutra` diffs against ../sutra/sutra.py when present (freshness).
@@ -23,7 +25,8 @@ DEST="${1:?usage: vendor.sh <dest-bin-dir>}"
 # into every pill's dev-box `check-sutra` freshness diff; it must not also
 # leak into an actual vendored copy).
 if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1 &&
-   ! git -C "$SRC" diff --quiet -- sutra.py sutra_update.py pill.js; then
+   [ -n "$(git -C "$SRC" status --porcelain -- sutra.py sutra_update.py \
+       sutra_xen.py pill.js)" ]; then
     echo "vendor: canonical sutra has uncommitted changes to a vendored" \
          "file — commit or stash before vendoring" >&2
     exit 1
@@ -43,6 +46,13 @@ usha="$(sha256sum "$SRC/sutra_update.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$usha" > "$DEST/sutra_update.version"
 echo "vendored sutra_update -> $DEST/sutra_update.py"
 echo "  $usha"
+# Same for the Xen guest-surface reader — vendored unconditionally like the
+# update spine; a pill with no Xen concerns simply doesn't import it.
+cp "$SRC/sutra_xen.py" "$DEST/sutra_xen.py"
+xsha="$(sha256sum "$SRC/sutra_xen.py" | cut -d' ' -f1)"
+printf '%s  %s\n' "$ver" "$xsha" > "$DEST/sutra_xen.version"
+echo "vendored sutra_xen -> $DEST/sutra_xen.py"
+echo "  $xsha"
 
 # Extension commons: pill.js lands in the EXTENSION dir (second arg), not
 # bin/ — GJS imports siblings only, and the extension dir is what `make
