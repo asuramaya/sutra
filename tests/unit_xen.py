@@ -80,8 +80,14 @@ with tempfile.TemporaryDirectory() as td:
 check("is_guest(xen)", sx.is_guest("xen") is True)
 check("is_guest(none)", sx.is_guest("none") is False)
 check("is_guest(kvm) - any real hypervisor counts", sx.is_guest("kvm") is True)
-# live: this dev box itself is a Xen guest (systemd-detect-virt=xen, confirmed)
-check("is_guest() live on this box", sx.is_guest() is True)
+# live, whatever this box actually is right now (never hard-code a specific
+# hypervisor here: dev boxes migrate, and a "must be Xen" assertion is a
+# flaky test waiting to fire the day it isn't -- exactly what happened to
+# the previous version of this line). Real signature: consistent with a
+# real virt_type() call, and it doesn't raise.
+live_vtype = sx.virt_type()
+check(f"is_guest() live on this box (virt_type={live_vtype!r})",
+      sx.is_guest() == (live_vtype not in (None, "none")))
 
 
 # --- balloon reader ---------------------------------------------------------

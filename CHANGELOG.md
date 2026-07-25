@@ -185,3 +185,26 @@
   and the commit anchor matches canonical HEAD exactly (skipped, not
   failed, when the canonical tree itself is dirty or not a git
   checkout).
+
+## 0.7.1 — community files (2026-07-25)
+
+- `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` added — sutra was
+  0/3 on the family's standard community-file set (every pill is 4/4;
+  sutra had README + CHANGELOG but not these three), flagged in a
+  family-wide remote-presentation sweep. `CODE_OF_CONDUCT.md` matches the
+  family's own short-form template verbatim (ByeByte/phanspeed/RAMstein
+  already agree on it; kast's longer Contributor Covenant text is the
+  outlier). `CONTRIBUTING.md`/`SECURITY.md` are sutra-specific, not
+  copied: sutra isn't a daemon like the pills, so both describe what
+  actually applies here — the vendoring model, the low-rate-of-change /
+  Linux-only / no-kernel-code-outside-its-module doctrine, the
+  `ControlServer`/`load_config`/`write_status` hardening every pill
+  inherits, and `sutra_update.py`'s trust chain. No behavior changed.
+- Unrelated fix found while re-running `make smoke` before this commit:
+  `tests/unit_xen.py`'s live `is_guest()` check hard-asserted this dev box
+  is a Xen guest (true when 0.5.0 was written; the box has since moved
+  off Xen, and the assertion started failing — a flaky test by
+  construction, asserting transient environment state as if it were a
+  fixture). Now asserts internal consistency instead
+  (`is_guest() == (virt_type() not in (None, "none"))`), which holds
+  regardless of what the box actually is at test time.
