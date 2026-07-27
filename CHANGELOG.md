@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.2 — the generic status-emitter recipe (2026-07-27)
+
+- README gains a new section documenting the Xfce (`genmon`) / Hyprland
+  (waybar, eww, ironbar) path: both consume a script polled on an
+  interval, which is exactly `sutra.py`'s existing client surface
+  (`read_status`/`request`) aimed at one more consumer. Doc-only —
+  no new API, no new module, no vendoring change. Raised by the operator
+  as "what if sutra reached KDE/Xfce/Cinnamon/Hyprland"; ruled on by
+  Alfred (msg 1434): the recipe half is unblocked and costs nothing
+  because it documents what already exists, while anything that adds a
+  module (a KDE `pill.qml`, a Cinnamon port of `pill.js`) stays held —
+  API growth for a new consumer class, and a scope question ("does
+  every pill now ship non-GNOME variants forever?") that belongs to the
+  operator, not to sutra alone.
+
 ## 0.1.0 — the backbone extracted
 - sutra.py: the shared pill runtime, factored from ByeByte (the reference)
   and confirmed identical in RAMstein: ControlServer (SO_PEERCRED-gated

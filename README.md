@@ -62,11 +62,35 @@ Xen adaptation program:
 |---|---|
 | `virt_type()` / `is_guest()` | systemd-detect-virt when present (honest report — kvm/docker/etc.), `/proc/xen` + DMI vendor as the xen-or-none fallback. |
 | `balloon_target_kb()` / `balloon_headroom_kb()` | the xen_memory sysfs surface — the hypervisor's granted `target_kb` vs `/proc/meminfo`'s MemTotal; the gap is real (memory not yet onlined), and the ceiling a balloon-aware pill should use. |
-| `refresh_host_telemetry()` | caches an injected `fetch()`'s result to a local status.json via `write_status`. The actual transport (orchestratord's `host.telemetry`, node-signed over the guest↔dom0 bridge) is XEN.md-gated — not built here. |
+| `refresh_host_telemetry()` | caches an injected `fetch()`'s result to a local status.json via `write_status`. The actual transport (orchestratord's `host.telemetry` over the guest↔dom0 bridge, unauthenticated for reads — signing is actuation-only) is XEN.md-gated — not built here. |
 
 `pill.js` — the GNOME extension commons (palette, status read + staleness
 rule, socket writer, row helpers, update surface, indicator boilerplate);
 see its own header comment for the full export list.
+
+## Elsewhere: the generic status-emitter recipe
+
+Not every desktop wants a rich extension. Xfce's `genmon` panel plugin and a
+Hyprland user's bar of choice (waybar, eww, ironbar) share the same shape:
+poll a script on an interval and render whatever it prints. That's already
+`sutra.py`'s client side — `read_status(status_path)` for the cheap read, or
+`request(socket_path, {"cmd": "ping"})` when a live check is worth the extra
+syscall. A pill reaching Xfce or Hyprland doesn't need new sutra code, just a
+short script shaped like:
+
+```python
+#!/usr/bin/env python3
+import json, sutra
+status = sutra.read_status("/run/<pill>/status.json")
+print(json.dumps({"text": status.get("summary", "?"),
+                   "tooltip": status.get("detail", "")}))
+```
+
+— its stdout shaped to whatever the target consumes (genmon's plain text plus
+optional `<tool>`/`<img>` tags; waybar/eww's JSON `text`/`tooltip`/`class`).
+No new API, no module, no vendoring change: this is the existing client
+surface aimed at one more consumer. The portable artifact was always the
+protocol, never the runtime.
 
 ## Using it
 
