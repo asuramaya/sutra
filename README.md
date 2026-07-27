@@ -92,6 +92,27 @@ No new API, no module, no vendoring change: this is the existing client
 surface aimed at one more consumer. The portable artifact was always the
 protocol, never the runtime.
 
+## Roadmap
+
+sutra's own reach is GNOME today; here's where the rest of the desktop
+landscape stands, so a reader can tell "not supported" from "supported
+without a module" at a glance:
+
+- **Xfce and Hyprland — already served.** Both consume the generic
+  status-emitter recipe above through sutra's existing client surface.
+  Nothing further is planned because nothing further is needed.
+- **Cinnamon — planned, the cheap one.** Its applet API is a fork of
+  GNOME Shell's, so this is expected to be a port of `pill.js` rather
+  than a rewrite. No date.
+- **KDE — planned, no date, no rush.** A native `pill.qml` Plasmoid,
+  written in QML rather than ported, since Plasma shares no runtime
+  with GJS. Held pending a KDE machine or harness existing anywhere in
+  this project — none does yet, so nothing here could build or verify
+  one honestly.
+- **Anything beyond Linux — out of scope**, by standing ruling: the
+  portable artifact is the protocol (this README, the family's
+  `FAMILY.md`), never the runtime.
+
 ## Using it
 
 `tests/toy_daemon.py` is the reference example — a whole (tiny) pill built on

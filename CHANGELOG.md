@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.4 — a roadmap section (2026-07-27)
+
+- README gains "Roadmap", below the status-emitter recipe: Xfce and
+  Hyprland marked **already served** (the 0.7.2 recipe, not pending
+  work); Cinnamon **planned** (its applet API forks GNOME Shell's, so
+  `pill.js` is expected to port rather than get rewritten); KDE
+  **planned, no date** (a native `pill.qml`, QML sharing no runtime
+  with GJS); anything beyond Linux **out of scope** by standing ruling.
+  Operator resolved the scope question 0.7.2/0.7.3 raised ("what if
+  sutra reached KDE/Xfce/Cinnamon/Hyprland"): on the roadmap, no
+  timeline, no KDE machine or harness in this fleet to build or verify
+  one against. Alfred's module-adding hold stands unchanged; the recipe
+  half was already shipped and needed no further work. Doc-only.
+  Alfred also registered a fleet-wide blind spot (`surface: kde-plasma`)
+  noting no KDE execution environment exists anywhere in this project —
+  a `pill.qml` written without one would pass every check this rig can
+  run and still never have been executed once — and explicitly scoped
+  Xfce/Hyprland as unaffected, since they consume the existing protocol
+  rather than needing new surface.
+
 ## 0.7.3 — LAG/DRIFT's freshness half anchors on the wrong HEAD (2026-07-27)
 
 - Bug found by Alfred within minutes of 0.7.2 shipping: that release
