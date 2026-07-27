@@ -22,13 +22,21 @@
 # The pill's CI runs:  sha256sum -c against sutra.version  (integrity, the
 # hard gate — hand-edited or corrupted, always a hard fail); `make
 # check-sutra`'s freshness half, when ../sutra/ is present, reads .commit
-# and asks canonical git which of two things this is: LAG (the recorded
-# commit is an ancestor of canonical HEAD — an old but honest vendor, warn
-# and exit 0) or DRIFT (the recorded commit isn't in canonical's history at
-# all — corrupted anchor or a rewritten canonical history, hard fail).
+# and asks canonical git which of two things this is, compared against
+# the FILE'S OWN last-modifying commit — never canonical repo HEAD, which
+# advances on every commit including ones that never touch this file
+# (decision d51e090f's original recipe compared against repo HEAD and
+# false-positived LAG across the whole family the first time a docs-only
+# commit landed; fixed by decision 325b1969). recorded ==
+# the file's last-modifying commit, or a descendant of it → fresh (an
+# honest vendor, nothing has changed since); recorded is a strict
+# ancestor of it → LAG (the file has genuinely moved on, warn and exit
+# 0); recorded isn't in canonical's history at all → DRIFT (corrupted
+# anchor or a rewritten canonical history, hard fail).
 # Custodian ruling (supersedes decision 4a2c4c2b's plain HEAD-compare with
-# the LAG/DRIFT split; thread 2ac0a67f carries the reference check-sutra
-# recipe every pill's Wave B adopts at its own next touch).
+# the LAG/DRIFT split, itself corrected by the per-file-head fix above;
+# thread 0627dac7 carries the reference check-sutra recipe every pill's
+# Wave B adopts at its own next touch).
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DEST="${1:?usage: vendor.sh <dest-bin-dir>}"

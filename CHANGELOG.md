@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.7.3 — LAG/DRIFT's freshness half anchors on the wrong HEAD (2026-07-27)
+
+- Bug found by Alfred within minutes of 0.7.2 shipping: that release
+  touched only `.gitignore`/`CHANGELOG.md`/`README.md`/`VERSION` — zero
+  code — and every pill carrying the LAG/DRIFT check-sutra recipe
+  (ByeByte, RAMstein, kast) immediately reported LAG, including kast,
+  which had re-vendored the day before and whose `sutra.py` bytes were
+  still byte-identical to canonical. The recipe (decision d51e090f)
+  compared the vendored `.commit` anchor against canonical **repo**
+  HEAD — which every commit advances, including ones that never touch
+  a vendored file. A README typo fix reads identically to a real
+  `sutra.py` change under that comparison, so the check couldn't tell
+  "the file moved on" from "something else in the repo moved on,"
+  and alarmed on the harmless case every time sutra ships anything at
+  all — the exact false-positive LAG/DRIFT was built to kill, just
+  moved one layer over.
+  Fix (decision 325b1969, supersedes d51e090f): compare the
+  recorded commit against the **vendored file's own** last-modifying
+  commit (`git log -1 --format=%H -- <file>`), not repo HEAD. Recorded
+  equal to, or a descendant of, the file's own head → fresh (the file
+  hasn't changed since vendoring, regardless of what else shipped).
+  Recorded a strict ancestor of it → LAG, unchanged (warn, exit 0).
+  Not in canonical's history at all → DRIFT, unchanged (hard fail).
+  `vendor.sh`'s anchor-writing is untouched — it already wrote repo
+  HEAD at vendor time, which is always equal to or a descendant of the
+  file's own last-modifying commit, so every existing `.commit` anchor
+  in the wild is still valid input to the corrected check. Only the
+  comparison target in each pill's `check-sutra` Makefile target
+  changes; `vendor.sh`'s header comment updated to describe it
+  correctly. Recipe recorded in osiris (thread 0627dac7); ByeByte,
+  RAMstein and kast each pick up the corrected version at their own
+  next touch, same non-big-bang Wave B pace as the original rollout —
+  the false LAG is cosmetic (integrity's sha256 gate never depended on
+  it) so nothing is urgently broken in the meantime.
+
 ## 0.7.2 — the generic status-emitter recipe (2026-07-27)
 
 - README gains a new section documenting the Xfce (`genmon`) / Hyprland
