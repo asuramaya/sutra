@@ -81,8 +81,21 @@ both at its own next touch (a **new version**, never a re-cut of a sealed
 release — same non-big-bang pace as every other Wave B adoption).
 Obligation thread `20819d5a` tracks the coordinated pass. Per repo:
 
-- **`vendor.sh`'s `DEST`** now points at `<prefix>/share/<pill>/lib/` (or
-  wherever the pill's build stages it before packaging), not `bin/`.
+- **`vendor.sh`'s `DEST`, in a repo checkout, is `src/share/<pill>/lib/`
+  — not a free choice.** The preamble *derives* its lib dir from the
+  binary's own location (`dirname(dirname(realpath(__file__)))/share/
+  <pill>/lib`); it is never told a prefix. From `src/bin/<pill>` that
+  arithmetic only ever resolves to `src/share/<pill>/lib` — nowhere
+  else, regardless of what other per-pill convention the repo already
+  has (e.g. a `src/data/` dir for man pages/config is not a substitute:
+  measured — coldspot vendored to `src/data/lib` following exactly that
+  local convention, landed on `main`, CI green, and every binary
+  ModuleNotFoundError'd on `import sutra` in the checkout, because
+  `src/bin/coldspot` derives `src/share/coldspot/lib`, full stop). Only
+  the *packaging* step (the `.deb`'s Makefile target, `install.sh`) has
+  real latitude, because it stages into `$DEBROOT`/`$PREFIX` paths the
+  preamble also derives correctly at install time — the repo tree itself
+  does not.
 - **`.deb`'s Makefile target and `install.sh`** both currently do
   `install ... sutra.py $BINDIR/sutra.py` (or equivalent) — change the
   destination to `$SHAREDIR/lib/sutra.py` (most pills already have a
@@ -101,3 +114,11 @@ Obligation thread `20819d5a` tracks the coordinated pass. Per repo:
   guard that only ever reads the dev-tree copy while the machine runs a
   different installed copy is the same blind spot the collision itself
   exploited, one layer out.
+- **`make smoke` should run a binary straight from the checkout**, not
+  only from a staged/synthetic prefix tree — `python3 src/bin/<pill>
+  --help`, expect `rc 0`. A synthetic prefix built by the test proves
+  the preamble resolves in a *correctly laid out* tree by construction;
+  it says nothing about whether the actual repo on disk is that tree.
+  That's exactly the gap the coldspot break above passed through: its
+  restructured tests proved the staged case and never ran the binary
+  where it actually lives.

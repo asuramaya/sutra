@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.8.1 — BOOTSTRAP.md's repo-tree latitude was a live bug (2026-07-28)
+
+- 0.8.0's BOOTSTRAP.md said `vendor.sh`'s `DEST` in a repo checkout is
+  `src/share/<pill>/lib/` "or wherever the pill's build stages it before
+  packaging" — true of the packaging step, false of the tree, and read
+  as permission. Coldspot's adoption vendored to `src/data/lib`
+  (following coldspot's own existing per-pill data-dir convention),
+  landed on main, CI green, and every binary ModuleNotFoundError'd on
+  `import sutra` in the checkout: the preamble *derives* its lib dir
+  from the binary's own location (`src/bin/<pill>` only ever resolves to
+  `src/share/<pill>/lib`, by the same arithmetic that makes it
+  prefix-agnostic at install time), so the repo-tree location isn't a
+  choice the way the packaging destination is. RAMstein and ByeByte
+  landed on the correct shape independently; coldspot followed the
+  doc's stated latitude and broke. Caught by Alfred within the hour
+  (third instance this week of a doc naming a goal and leaving the
+  mechanism to each seat — REPO-STANDARD's row count and the
+  release-notes recipe were the first two).
+  Fix: BOOTSTRAP.md now states `src/share/<pill>/lib/` as the repo-tree
+  location plainly, explains why in one line (derived, not told), and
+  the packaging-step latitude is scoped to actual packaging only. Also
+  adds a `make smoke` recommendation every adopter should carry: run a
+  binary straight from the checkout (`python3 src/bin/<pill> --help`,
+  expect rc 0), not only from a staged synthetic prefix tree — a
+  synthetic tree built correct by construction proves the preamble
+  resolves in a correctly-laid-out tree and says nothing about whether
+  the actual repo on disk is one. Doc-only; the preamble itself is
+  unchanged and was independently verified by Alfred before the Wave B
+  dispatch that surfaced this.
+
 ## 0.8.0 — the install-path bootstrap (2026-07-28)
 
 - **The collision.** Every pill vendors sutra.py/sutra_update.py/
