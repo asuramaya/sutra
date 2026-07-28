@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.8.0 — the install-path bootstrap (2026-07-28)
+
+- **The collision.** Every pill vendors sutra.py/sutra_update.py/
+  sutra_xen.py byte-identical into a SHARED system directory (/usr/bin
+  via .deb, /usr/local/bin via install.sh) under the same filenames.
+  Six of six. Any two pills installed together collide: dpkg refuses
+  the second outright (Till's finding — RAMstein's .deb refused because
+  phanspeed's already owned /usr/bin/sutra.py); install.sh's plain
+  `install` has no ownership tracking and silently overwrites, anchors
+  included. Measured on the operator's own machine: /usr/bin/sutra.py
+  and /usr/local/bin/sutra.py were already two different canonical
+  commits, and /usr/bin carried no .version/.commit anchors at all, so
+  nothing could detect the mix. Same shape as the CI-drift class (0.7.5)
+  one layer out: a guard that reads the wrong copy reads green while the
+  machine runs different bytes. Ruling: decision 3e44bd95 (operator
+  handed Alfred the call); obligation thread 20819d5a tracks the
+  coordinated pass across all six pills.
+  Fix: vendored copies move to `<prefix>/share/<pill>/lib/` — a private,
+  per-pill directory, off the same $PREFIX the binaries already use —
+  with .version/.commit landing there too, always. Every binary that
+  imports sutra needs a small sys.path preamble to find them there,
+  since co-location (Python auto-adds a running script's own directory
+  to sys.path) is what silently made this collision inevitable in the
+  first place. New **BOOTSTRAP.md** documents the fix and publishes the
+  exact preamble text, so no pill hand-derives its own and gets the
+  relative-path arithmetic or the idempotency check subtly wrong in only
+  one of six repos. `vendor.sh` gains `--bootstrap=<pill-name>` (also
+  reachable as `make vendor ... BOOTSTRAP=<pill-name>`), printing that
+  preamble ready to paste, with the pill name as the only thing that
+  ever varies. `vendor.sh`'s usage/header comment and README's vendor
+  example updated for the new DEST convention (a private lib dir, never
+  a shared bin/); pill.js is unaffected (already installs per-pill under
+  `<prefix>/share/<pill>/extension/<uuid>/`, stated explicitly so nobody
+  "fixes" it).
+  Verified before publishing, not just reasoned through: two pills
+  vendored and "installed" under one shared prefix with zero file
+  collisions, each binary correctly resolving to its own pill's sutra.py
+  from a bin/ directory containing no sutra*.py at all; the same
+  mechanism verified again across two different prefixes (/usr,
+  /usr/local) to confirm it needs no prefix told to it; and a
+  double-paste of the preamble in one file confirmed idempotent (no
+  duplicate sys.path entry).
+  This is sutra's half only: each pill still needs its own Makefile/
+  `.deb`/`install.sh`/`uninstall.sh` updated to point at the new path,
+  paste the preamble into every relevant binary, and clean up the old
+  shared-dir files on upgrade — tracked per-repo under obligation thread
+  20819d5a, landing as a new version in each pill, never a re-cut.
+
 ## 0.7.5 — CI has been red since 0.2.0, and the check was wrong (2026-07-28)
 
 - The operator noticed CI failing across the family; Alfred traced sutra's

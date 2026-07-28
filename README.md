@@ -120,8 +120,16 @@ sutra: `import sutra`, a `DEFAULTS`/`CLAMPS` pair, a `dispatch` callable, the
 loop. Copy that shape. To vendor into a pill:
 
 ```sh
-make vendor DEST=/home/asuramaya/code/REPOS/ByeByte/bin
+make vendor DEST=/home/asuramaya/code/REPOS/ByeByte/share/byebyte/lib \
+            EXT=/home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya \
+            BOOTSTRAP=byebyte
 ```
+
+DEST is the pill's own **private** lib dir, never a shared `bin/` — see
+[BOOTSTRAP.md](BOOTSTRAP.md) for why (six pills vendoring identically-named
+files into the same shared bin dir makes any two of them uninstallable
+together) and for the small `sys.path` preamble `BOOTSTRAP=<pill-name>`
+prints, which every binary that does `import sutra` needs pasted in once.
 
 ## Test
 

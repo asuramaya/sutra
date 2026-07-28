@@ -13,7 +13,8 @@ sutra.py          the backbone: ControlServer, config, status, health, notify
 sutra_update.py    the family's update spine (trust chain, consent tiers)
 sutra_xen.py       the Xen guest-surface reader (virt detection, balloon, host telemetry)
 pill.js            the GNOME extension commons (JS, vendored into each pill's extension dir)
-vendor.sh          copies the above into a pill, with drift anchors
+vendor.sh          copies the above into a pill's private lib dir, with drift anchors
+BOOTSTRAP.md        the sys.path preamble every pill binary needs to find its vendored copies
 tests/             unit suites + attack_socket.py (adversarial fuzz)
 ```
 

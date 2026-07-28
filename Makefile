@@ -14,7 +14,9 @@ check-version:
 
 check: smoke attack check-version
 
-# vendor sutra into a pill's bin dir:  make vendor DEST=/path/to/pill/bin
+# vendor sutra into a pill's private lib dir (see BOOTSTRAP.md — DEST is
+# never a shared bin/):  make vendor DEST=<pill>/share/<pill>/lib
+#   [EXT=<extension-dir>] [BOOTSTRAP=<pill-name>]
 vendor:
-	@[ -n "$(DEST)" ] || { echo "usage: make vendor DEST=<pill>/bin"; exit 1; }
-	bash vendor.sh "$(DEST)"
+	@[ -n "$(DEST)" ] || { echo "usage: make vendor DEST=<pill>/share/<pill>/lib [EXT=<ext-dir>] [BOOTSTRAP=<pill-name>]"; exit 1; }
+	bash vendor.sh "$(DEST)" $(if $(EXT),"$(EXT)") $(if $(BOOTSTRAP),--bootstrap="$(BOOTSTRAP)")

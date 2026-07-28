@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # vendor.sh — copy the canonical sutra.py into a pill, byte-identical, and
 # record the version+hash it came from so a CI drift-check can prove the copy
-# was never hand-edited. The pill imports it as a sibling of its daemon.
+# was never hand-edited.
 #
-#   ./vendor.sh /home/asuramaya/code/REPOS/ByeByte/bin \
-#               /home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya
+#   ./vendor.sh /home/asuramaya/code/REPOS/ByeByte/share/byebyte/lib \
+#               /home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya \
+#               --bootstrap=byebyte
+#
+# DEST is each pill's own PRIVATE lib dir, never a shared bin/ — six pills
+# vendoring identically-named sutra.py/sutra_update.py/sutra_xen.py into the
+# SAME shared /usr/bin (deb) or /usr/local/bin (install.sh) makes any two
+# pills uninstallable together (dpkg refuses the second outright; install.sh
+# silently overwrites, anchors included). See BOOTSTRAP.md for the collision
+# and the fix in full (ruling 3e44bd95): each pill's copies move to
+# <prefix>/share/<pill>/lib/, and every binary that imports sutra needs a
+# small sys.path bootstrap preamble to find them there — pass
+# --bootstrap=<pill-name> to print that preamble ready to paste.
 #
 # Writes:  <dest>/sutra.py           the byte-identical module
 #          <dest>/sutra.version      "<version>  <sha256>"  (the integrity anchor,
@@ -17,7 +28,8 @@
 # unconditionally beside it — a pill imports only what it needs), and, when
 # an extension dir is given, pill.js + pill.version + pill.commit there the
 # same way (the extension imports it as a sibling: `import * as Pill from
-# './pill.js'`).
+# './pill.js'` — pill.js is EXEMPT from the collision fix, it already installs
+# per-pill under <prefix>/share/<pill>/extension/<uuid>/ and cannot collide).
 #
 # The pill's CI runs:  sha256sum -c against sutra.version  (integrity, the
 # hard gate — hand-edited or corrupted, always a hard fail); `make
@@ -39,7 +51,18 @@
 # Wave B adopts at its own next touch).
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
-DEST="${1:?usage: vendor.sh <dest-bin-dir>}"
+
+BOOTSTRAP_PILL=""
+args=()
+for a in "$@"; do
+    case "$a" in
+        --bootstrap=*) BOOTSTRAP_PILL="${a#--bootstrap=}" ;;
+        *) args+=("$a") ;;
+    esac
+done
+set -- "${args[@]+"${args[@]}"}"
+
+DEST="${1:?usage: vendor.sh <dest-lib-dir> [ext-dir] [--bootstrap=<pill-name>]}"
 
 # Refuse a dirty canonical tree: vendoring WIP would ship an uncommitted,
 # undecided edit into a pill under a version number nobody reviewed or
@@ -99,3 +122,29 @@ if [ $# -ge 2 ]; then
     echo "  $psha"
 fi
 echo "commit the vendored files and .version/.commit pairs; do not edit the copies — re-vendor."
+
+# --bootstrap=<pill-name>: print the canonical sys.path preamble ready to
+# paste. Sutra authors this ONCE so no pill hand-derives its own (and gets
+# the relative-path math, or the idempotency check, subtly wrong) — the
+# pill name is the only line that ever changes, and only between pills,
+# never within one. Instructions go to stderr so the code block on stdout
+# stays clean to redirect: vendor.sh DEST --bootstrap=NAME > preamble.py.txt
+if [ -n "$BOOTSTRAP_PILL" ]; then
+    echo "" >&2
+    echo "paste this at the top of every binary in $BOOTSTRAP_PILL that" \
+         "imports sutra, right before the 'import sutra' line (see" \
+         "BOOTSTRAP.md):" >&2
+    cat <<EOF
+# --- sutra bootstrap (sutra $ver; see BOOTSTRAP.md -- do not hand-edit) ----
+import os as _os
+import sys as _sys
+_PILL = "$BOOTSTRAP_PILL"
+_libdir = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.realpath(__file__))),
+    "share", _PILL, "lib")
+if _libdir not in _sys.path:
+    _sys.path.insert(0, _libdir)
+del _os, _sys, _libdir, _PILL
+# --- end sutra bootstrap ----------------------------------------------------
+EOF
+fi
