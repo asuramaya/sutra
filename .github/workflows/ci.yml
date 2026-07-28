@@ -10,18 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: syntax
         run: |
           python3 -m py_compile sutra.py tests/toy_daemon.py tests/unit.py \
             tests/attack_socket.py
-          bash -n tests/smoke.sh vendor.sh
+          bash -n tests/smoke.sh tests/check_version.sh vendor.sh
       - name: smoke
         run: make smoke
       - name: attack
         run: make attack
-      - name: version matches
-        run: |
-          v="$(tr -d '[:space:]' < VERSION)"
-          m="$(sed -n 's/^SUTRA_VERSION = "\(.*\)"$/\1/p' sutra.py)"
-          echo "VERSION=$v  SUTRA_VERSION=$m"
-          [ "$v" = "$m" ] || { echo "::error::VERSION != SUTRA_VERSION"; exit 1; }
+      - name: check-version
+        run: make check-version

@@ -22,13 +22,15 @@ tests/             unit suites + attack_socket.py (adversarial fuzz)
 No build step, stdlib-only. Run the test suites directly:
 
 ```bash
-make smoke     # unit tests + a staged vendored-layout daemon boot
-make attack    # adversarial socket fuzz
+make smoke          # unit tests + a staged vendored-layout daemon boot
+make attack         # adversarial socket fuzz
+make check-version  # a changed file's own version constant moved too
+make check          # all three
 ```
 
 ## Before opening a PR
 
-- `make smoke` and `make attack` both pass.
+- `make check` passes (`smoke` + `attack` + `check-version`).
 - Stay **stdlib-only** — sutra is vendored, not `pip install`ed; a pill can't
   bring in a dependency sutra doesn't already have.
 - A new function belongs here only if **multiple pills need it verbatim**.

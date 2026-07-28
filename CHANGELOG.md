@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.7.5 — CI has been red since 0.2.0, and the check was wrong (2026-07-28)
+
+- The operator noticed CI failing across the family; Alfred traced sutra's
+  case to `ci.yml`'s last step, `version matches`, asserting `VERSION ==
+  SUTRA_VERSION` — a rule from before the per-file version convention
+  (0.4.0), never updated after that convention decoupled the two on
+  purpose. Result: **every commit since 0.2.0 failed CI** (only the very
+  first, 0.1.0, was ever green) — eleven consecutive false failures,
+  `smoke`/`attack`/the vendor.sh anchor check all genuinely green the
+  whole time underneath. sutra sits under every pill's integrity chain,
+  so this meant no CI signal has ever actually protected a sutra release.
+  Same shape as three other cases the family hit this week (phanspeed,
+  kast, coldspot): CI holding a stale copy of a rule the project moved
+  past.
+  Fix: `tests/check_version.sh` (new) asserts the invariant the
+  convention actually needs — a file's own version constant must move
+  whenever the file's own bytes do (`git diff --quiet HEAD~1 HEAD --
+  <file>`, then compare the constant before/after); `VERSION` is free to
+  move independently, exactly as CONTRIBUTING.md already says. One
+  generic pattern covers all four constants (`SUTRA_VERSION`,
+  `SUTRA_UPDATE_VERSION`, `SUTRA_XEN_VERSION`, `PILL_JS_VERSION`) —
+  Python double-quoted or JS single-quoted, doesn't matter. New `make
+  check-version` target (folded into `make check`); `ci.yml`'s inline
+  assertion replaced with `run: make check-version`, per the family
+  ruling that CI invokes Makefile targets and never carries its own copy
+  of a rule. Checkout gains `fetch-depth: 0` so `HEAD~1` actually
+  resolves (the previous shallow checkout would have made this new check
+  silently skip on every run otherwise). Verified against five scripted
+  cases in scratch repos before publishing (unchanged file, real
+  change + correct bump, real change + forgotten bump in both a Python
+  and a JS file, `VERSION`-alone-moves — the exact false-positive shape
+  this replaces) — same discipline as the LAG/DRIFT freshness fix
+  (0.7.3): test the implementation, not the description of it.
+
 ## 0.7.4 — a roadmap section (2026-07-27)
 
 - README gains "Roadmap", below the status-emitter recipe: Xfce and
