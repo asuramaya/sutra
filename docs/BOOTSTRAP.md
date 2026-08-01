@@ -74,6 +74,79 @@ handed to it and never hardcodes one. Verified against a simulated
 co-install of two pills under one prefix, and separately under two
 different prefixes, before publishing — not just reasoned through.
 
+## The canonical check-sutra recipe
+
+The bootstrap preamble above is half of what a pill needs to vendor sutra
+correctly; the other half is verifying, on an ongoing basis, that the
+vendored copy hasn't gone stale or been hand-edited. That verification —
+`check-sutra` — has the same re-derivation problem the preamble did: left to
+each pill, five pills produced five variants, and four of them share the same
+bug. Publishing it here, once, is the fix, the same way the preamble was.
+
+```makefile
+check-sutra:
+	@canon="$$HOME/code/REPOS/sutra"; \
+	fail=0; \
+	for mod in sutra sutra_update sutra_xen; do \
+	    py="<dest-lib-dir>/$$mod.py"; ver="<dest-lib-dir>/$$mod.version"; cmt="<dest-lib-dir>/$$mod.commit"; \
+	    v=$$(cut -d' ' -f1 "$$ver"); \
+	    sha=$$(awk '{print $$NF}' "$$ver"); \
+	    actual=$$(sha256sum "$$py" | cut -d' ' -f1); \
+	    if [ "$$sha" != "$$actual" ]; then \
+	        echo "check-sutra FAIL: $$py doesn't match $$ver" \
+	             "(hand-edited? re-vendor: bash ~/code/REPOS/sutra/vendor.sh <dest-lib-dir> <ext-dir> --bootstrap=<pill>)"; \
+	        fail=1; continue; \
+	    fi; \
+	    echo "check-sutra: integrity ok ($$mod $$v, sha256 $$sha)"; \
+	    if [ -d "$$canon/.git" ]; then \
+	        if [ ! -f "$$cmt" ]; then \
+	            echo "check-sutra: freshness unknown for $$mod (no $$cmt anchor, an older vendor)"; \
+	        else \
+	            recorded=$$(cat "$$cmt"); \
+	            filehead=$$(git -C "$$canon" log -1 --format=%H -- "$$mod.py"); \
+	            if git -C "$$canon" merge-base --is-ancestor "$$filehead" "$$recorded" 2>/dev/null; then \
+	                echo "check-sutra: freshness ok ($$mod vendored from $$recorded, at or after its own head $$filehead)"; \
+	            elif git -C "$$canon" merge-base --is-ancestor "$$recorded" "$$filehead" 2>/dev/null; then \
+	                echo "check-sutra: LAG ($$mod vendored from $$recorded, canonical has since moved to $$filehead) -- warn, not a failure"; \
+	            else \
+	                echo "check-sutra FAIL: DRIFT ($$mod's vendored commit $$recorded is not in canonical's history at $$canon) -- re-vendor"; \
+	                fail=1; \
+	            fi; \
+	        fi; \
+	    fi; \
+	done; \
+	if [ ! -d "$$canon/.git" ]; then \
+	    echo "check-sutra: canonical sutra checkout not present, freshness skipped"; \
+	fi; \
+	exit $$fail
+```
+
+`<dest-lib-dir>` is the same private per-pill lib dir the preamble resolves to
+(`src/share/<pill>/lib/` in a repo checkout — see below); `<ext-dir>` and
+`<pill>` are only used inside the re-vendor hint. Extend the `for mod in ...`
+line with `pill.js` (and point `py`/`ver`/`cmt` at the extension dir instead)
+if the pill also vendors it there.
+
+**Integrity** is the hard gate: a mismatched sha256 means the copy was
+hand-edited or corrupted, full stop, `fail=1`, no LAG/DRIFT nuance applies.
+
+**Freshness** is the half that had a real, shipped bug. The correct
+comparison is `recorded` (the `.commit` anchor) against
+`git -C "$canon" log -1 --format=%H -- "$mod.py"` — that file's *own* last
+commit in canonical history. Recorded at-or-after that commit → fresh.
+Recorded a strict ancestor of it → LAG, the vendored copy has genuinely
+fallen behind, warn only, exit 0. Recorded not in canonical's history at all
+→ DRIFT, hard fail. **The bug this replaces**: comparing `recorded` against
+`git -C "$canon" rev-parse HEAD` instead — canonical's whole-repo HEAD, which
+moves on *every* commit, including ones that never touch `$mod.py` at all.
+That false-positives a LAG warning (sometimes worse) on a docs-only commit
+that changed nothing the vendored copy actually depends on. Decision
+`325b1969` corrected it; as of this writing it has reached one pill
+(coldspot, at its commit `d32f802`) out of five that carry a `check-sutra`
+target at all. The other four still compare against `rev-parse HEAD` and
+should switch to the form above at their own next touch — same non-big-bang
+pace as the preamble adoption, thread `0627dac7`.
+
 ## What a pill's own migration touches
 
 sutra publishes the preamble and the path convention; each pill applies

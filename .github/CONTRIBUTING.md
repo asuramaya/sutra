@@ -14,7 +14,8 @@ sutra_update.py    the family's update spine (trust chain, consent tiers)
 sutra_xen.py       the Xen guest-surface reader (virt detection, balloon, host telemetry)
 pill.js            the GNOME extension commons (JS, vendored into each pill's extension dir)
 vendor.sh          copies the above into a pill's private lib dir, with drift anchors
-BOOTSTRAP.md        the sys.path preamble every pill binary needs to find its vendored copies
+docs/              BOOTSTRAP.md, ARCHITECTURE.md, USAGE.md, RELEASING.md, CHANGELOG.md
+packaging/         VERSION, the repo's release counter
 tests/             unit suites + attack_socket.py (adversarial fuzz)
 ```
 
@@ -45,8 +46,8 @@ make check          # all three
   daemons on a local socket; untrusted input must never crash it.
 - Bump the touched file's own version constant. Each file's constant
   (`SUTRA_VERSION`, `SUTRA_UPDATE_VERSION`, ...) tracks that file's own
-  content history, independent of the repo's release counter in `VERSION` —
-  see CHANGELOG.md for the full convention.
+  content history, independent of the repo's release counter in
+  `packaging/VERSION` — see docs/CHANGELOG.md for the full convention.
 
 ## License
 

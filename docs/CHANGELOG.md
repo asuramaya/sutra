@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.9.0 — REPO-STANDARD catch-up: fourteen rows, check-repo, recipes stop being copied by hand (2026-08-01)
+
+- sutra converges on the family's REPO-STANDARD.md: root goes from
+  seventeen tracked rows to fourteen. `CODE_OF_CONDUCT.md`/`CONTRIBUTING.md`/
+  `SECURITY.md` move to `.github/`, `CHANGELOG.md`/`BOOTSTRAP.md` move to
+  `docs/`, `VERSION` moves to `packaging/`, `.gitattributes` is added. The
+  five product files (`sutra.py`, `sutra_update.py`, `sutra_xen.py`,
+  `pill.js`, `vendor.sh`) stay at root under a recorded exemption — see
+  `docs/ARCHITECTURE.md` — moving them under `src/` would break four
+  sibling pills' `check-sutra`, which read them by literal root-relative
+  path.
+- New `docs/ARCHITECTURE.md`, `docs/USAGE.md`, `docs/RELEASING.md`, a
+  `## Map` nav block in `README.md`.
+- New `make check-repo` gate, wired first in `ci.yml`, adapted (not
+  copied) from coldspot's reference implementation: required-file
+  presence honors the exemptions table for every entry, not just the
+  man-page case coldspot itself needed, and the stray-version-string
+  check excludes sutra's own ruled per-file version constants.
+- The corrected `check-sutra` freshness recipe — compare each vendored
+  file against its own last-modifying commit in canonical history, never
+  sutra's repo HEAD (decision `325b1969`) — is now published as canonical
+  copy-paste text in `docs/BOOTSTRAP.md`, same pattern as the bootstrap
+  preamble. It had reached one of five pills; this publishes it so the
+  rest can copy one correct thing instead of independently re-deriving it.
+- Per operator ruling, sutra still cuts no tagged release: sealing stays
+  blocked until sutra and mudra converge on this same pass.
+
 ## 0.8.1 — BOOTSTRAP.md's repo-tree latitude was a live bug (2026-07-28)
 
 - 0.8.0's BOOTSTRAP.md said `vendor.sh`'s `DEST` in a repo checkout is

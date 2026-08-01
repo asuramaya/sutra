@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # check_version.sh -- the invariant the per-file version convention
-# (CONTRIBUTING.md) actually needs enforced: a vendored file's own version
+# (.github/CONTRIBUTING.md) actually needs enforced: a vendored file's own version
 # constant moves whenever the file's own bytes do. The repo VERSION release
 # counter is decoupled by design and free to move independently. A prior CI
 # step asserted VERSION == SUTRA_VERSION instead -- correct before the

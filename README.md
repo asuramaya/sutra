@@ -14,6 +14,17 @@ loader, the atomic status writer, the burn-rate math. sutra is that skeleton,
 factored to **one canonical source** so a fix (especially a security fix to the
 socket) lands once instead of six times.
 
+## Map
+
+| | |
+|---|---|
+| Use it | [docs/USAGE.md](docs/USAGE.md) |
+| Change it | [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) |
+| Understand how it's built | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Cut a release | [docs/RELEASING.md](docs/RELEASING.md) |
+| See what changed | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
+| Report a vulnerability | [.github/SECURITY.md](.github/SECURITY.md) |
+
 ## Cake, and eat it: vendored, not depended-on
 
 Every file here is **stdlib-only**. Pills don't `pip install` sutra and don't
@@ -126,7 +137,7 @@ make vendor DEST=/home/asuramaya/code/REPOS/ByeByte/share/byebyte/lib \
 ```
 
 DEST is the pill's own **private** lib dir, never a shared `bin/` — see
-[BOOTSTRAP.md](BOOTSTRAP.md) for why (six pills vendoring identically-named
+[docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) for why (six pills vendoring identically-named
 files into the same shared bin dir makes any two of them uninstallable
 together) and for the small `sys.path` preamble `BOOTSTRAP=<pill-name>`
 prints, which every binary that does `import sutra` needs pasted in once.

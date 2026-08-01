@@ -11,7 +11,7 @@
 # vendoring identically-named sutra.py/sutra_update.py/sutra_xen.py into the
 # SAME shared /usr/bin (deb) or /usr/local/bin (install.sh) makes any two
 # pills uninstallable together (dpkg refuses the second outright; install.sh
-# silently overwrites, anchors included). See BOOTSTRAP.md for the collision
+# silently overwrites, anchors included). See docs/BOOTSTRAP.md for the collision
 # and the fix in full (ruling 3e44bd95): each pill's copies move to
 # <prefix>/share/<pill>/lib/, and every binary that imports sutra needs a
 # small sys.path bootstrap preamble to find them there — pass
@@ -78,7 +78,7 @@ if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1 &&
 fi
 
 [ -d "$DEST" ] || { echo "vendor: $DEST is not a directory" >&2; exit 1; }
-ver="$(tr -d '[:space:]' < "$SRC/VERSION")"
+ver="$(tr -d '[:space:]' < "$SRC/packaging/VERSION")"
 # The LAG-vs-DRIFT anchor: which canonical commit this vendor came from.
 # Empty (never written) when canonical isn't a git checkout at all — a
 # pill's check-sutra treats a missing .commit as "freshness unknown", not
@@ -133,9 +133,9 @@ if [ -n "$BOOTSTRAP_PILL" ]; then
     echo "" >&2
     echo "paste this at the top of every binary in $BOOTSTRAP_PILL that" \
          "imports sutra, right before the 'import sutra' line (see" \
-         "BOOTSTRAP.md):" >&2
+         "docs/BOOTSTRAP.md):" >&2
     cat <<EOF
-# --- sutra bootstrap (sutra $ver; see BOOTSTRAP.md -- do not hand-edit) ----
+# --- sutra bootstrap (sutra $ver; see docs/BOOTSTRAP.md -- do not hand-edit) ----
 import os as _os
 import sys as _sys
 _PILL = "$BOOTSTRAP_PILL"
