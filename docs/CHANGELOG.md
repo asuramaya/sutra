@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.12.4 — sutra doesn't release: a structural ruling documented as a timing gate (2026-08-01)
+
+Doc-only. The operator ordered "get everyone to tag so I can seal";
+Alfred's dispatch (msg 2866) read that as including sutra and ordered a
+full release-signing build (`allowed_signers`, `sync-signers.sh`,
+`release.yml`, `docs/RELEASE-SIGNING.md`). Held before building (msg
+2877): `~/code/REPOS/RELEASE.md:201`, the family's own ratified cross-repo
+release doctrine, already rules sutra `n/a (vendored, not released
+alone) ... its integrity story is the vendor hash chain` — a *structural*
+ruling, separate from the *timing* gate ("no sealing until sutra and
+mudra converge") that had just fired. Lifting a timing gate said nothing
+about a structural exemption it never touched. Alfred re-read RELEASE.md
+independently, agreed, and ruled: sutra builds no release machinery;
+"everyone" meant the repos that actually release (msg 2884).
+
+The near-miss had a real cause worth fixing, not just avoiding: two of
+sutra's own docs disagreed with `RELEASE.md:201` and with each other.
+`docs/RELEASING.md` described a ceremony ("1. Prepare / 2. Tag and
+publish / 3. The operator seals it") sutra would perform once a gate
+lifted; `docs/ARCHITECTURE.md`'s exemptions table gave the same "not yet"
+framing for the missing `release.yml`. Both implied machinery arrives
+after convergence. Neither does, ever — sutra has no daemon, CLI, or
+extension of its own to install (ARCHITECTURE.md's own exemptions table,
+one row up), so there is no standalone artifact for a `.deb`+tarball
+release to attach to in the first place. Every consumer already gets
+sutra's bytes via `vendor.sh`'s per-file sha256 anchor, verified
+continuously by every consuming pill's own `check-sutra` — a stronger,
+ongoing guarantee than a repo-level signature checked once at download.
+
+- **`docs/RELEASING.md` rewritten**: states plainly sutra doesn't release,
+  cites `RELEASE.md:201` by line, explains what the convergence gate
+  actually gated (the six pills' own tagging, which depended on sutra
+  being stable — never a sutra release of its own), and records the
+  correction so the next reader doesn't repeat the misreading.
+- **`docs/ARCHITECTURE.md`'s exemption row rewritten** to the same effect,
+  same citation.
+- **One sibling instance fixed**: the "Commit signing" section's closing
+  line cited sutra's own `docs/RELEASING.md` as "where the operator's
+  sealing ritual already lives" — true of the family in general, false of
+  this repo specifically. Reworded to point at a sealed pill's own
+  RELEASING.md instead and say plainly sutra has no such boundary.
+- Audited the rest of the repo's docs for the same implication
+  (`release.yml`/`sealing`/`allowed_signers`/`sync-signers` grep across
+  every `.md`): nothing else found.
+
+No vendored module touched, no release machinery written. `make check`
+green (15 rows).
+
 ## 0.12.3 — defect 8: signing-verify hardcoded a filename that's wrong for half the family (2026-08-01)
 
 Found by Aegis adopting pill-ci.yml, reported via Alfred (msg 2848).

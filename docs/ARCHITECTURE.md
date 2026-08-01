@@ -69,8 +69,9 @@ hard gate ("this copy was not hand-edited"); `.commit` is the freshness
 marker for the LAG-vs-DRIFT read ("is this copy at or after the file's own
 last commit"). Neither one was ever an authenticity claim, and neither needs
 a signed commit to do its job — authenticity, when it matters, belongs at the
-tag/release boundary, which is also where the operator's sealing ritual
-already lives (see `docs/RELEASING.md`).
+tag/release boundary, which is where the FAMILY's sealing ritual lives (see
+any sealed pill's own `docs/RELEASING.md`). sutra itself has no such
+boundary — see `docs/RELEASING.md` and the exemptions table below for why.
 
 ## Standard exemptions
 
@@ -84,4 +85,4 @@ this table is a bug, not a choice.
 | no `install.sh` / `uninstall.sh` | sutra has no standalone install — it ships no daemon, CLI, or extension of its own to put on a machine. It is consumed only by copying (`make vendor`, i.e. `vendor.sh`) into another pill's tree; there is no "front door" here to write one for. |
 | no `src/`, no man page | follows from the row above — there is no CLI surface here to organize under `src/bin`/`src/data`/`src/extension` or to document with a man page. |
 | per-file version constants (`SUTRA_VERSION`, `SUTRA_UPDATE_VERSION`, `SUTRA_XEN_VERSION`, `PILL_JS_VERSION`) exist alongside `packaging/VERSION` | deliberate, ruled, and mechanically enforced (`make check-version`, `tests/check_version.sh`) — not the drift the family's single-version-constant rule exists to catch. `packaging/VERSION` is the repo's own release counter; each vendored file's constant tracks that file's own content history independently, because pills vendor and freshness-check each file on its own timeline, not the whole repo's at once. See `.github/CONTRIBUTING.md` and `docs/BOOTSTRAP.md`. |
-| no `.github/workflows/release.yml` yet | sutra has never cut a tagged release. Under the operator's ruling, sealing is blocked until sutra and mudra converge on this same repo-structure pass — writing release machinery ahead of that would be a ceremony with nothing yet licensed to run it. |
+| no `.github/workflows/release.yml`, and there will not be one | Structural, not a gate waiting to lift: `~/code/REPOS/RELEASE.md:201` (the family's ratified cross-repo release doctrine) rules sutra `n/a (vendored, not released alone) ... its integrity story is the vendor hash chain`. sutra ships no daemon, CLI, or extension of its own (see the "no `install.sh`/`uninstall.sh`" row above) — no standalone artifact for a `.deb`+tarball release to attach to. Every consumer already receives sutra's bytes via `vendor.sh`'s per-file sha256 anchor, verified continuously by every consuming pill's own `check-sutra`, a stronger guarantee than a repo-level signature checked once at download. See `docs/RELEASING.md`. (Corrected 2026-08-01: an earlier version of this row cited the sutra/mudra CONVERGENCE TIMING gate as the reason, implying release machinery would arrive once that gate lifted — it doesn't; conflating a timing gate with a structural ruling nearly produced release machinery for a repo RELEASE.md itself already exempts.) |
