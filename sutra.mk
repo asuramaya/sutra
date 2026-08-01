@@ -99,46 +99,113 @@ check-sutra-rows:
 # tjmax's refinement (msg 1749): a binary that can't cleanly exit 0 in a
 # hardware-free runner (root/CAP_* requirements, no real device to talk to)
 # shouldn't fail this guard on that account -- that failure has nothing to
-# do with whether the vendored copy resolved correctly. So this checks two
-# independent things rather than one: (1) does running the real binary from
-# the checkout ever hit ModuleNotFoundError/ImportError -- if it does, that
-# IS this guard's business and it's a hard fail regardless of exit code;
-# (2) does the bootstrap preamble's own published arithmetic
-# (dirname(dirname(realpath(__file__)))/share/<pill>/lib, see
-# docs/BOOTSTRAP.md), computed from the REAL binary's real on-disk location,
-# resolve to exactly where sutra.mk itself is vendored. (2) is what proves
-# the exact expected path rather than trusting a self-report the binary
-# might not even print.
+# do with whether the vendored copy resolved correctly.
+#
+# CORRECTION (msg 2673, Alfred, caught by reproduction): the first cut of
+# this target computed the EXPECTED path in shell from the bootstrap
+# preamble's own formula and checked that a file exists there. That is a
+# LAYOUT check, not a RESOLUTION check -- it never asks Python what the
+# binary actually imported. A binary that forgot the bootstrap preamble
+# entirely, sitting beside a stale co-located sutra.py (the exact
+# pre-migration shape the whole ruling exists to clean up), would still
+# import successfully (Python's own sys.path includes the script's own
+# directory) and the shell arithmetic would still find a real file at the
+# computed path -- green on the precise regression this guard exists to
+# catch. Fixed below: load the binary as a module for real and read back
+# <module>.<SUTRA_CHECK_MODULE>.__file__, the path Python actually
+# resolved, never a second shell computation of what it SHOULD be.
 #
 # SUTRA_CHECK_BIN is the pill-specific part: which binary to run. Defaults
-# to src/bin/$(PILL), the family's established convention; override if a
-# pill's layout differs.
+# to src/bin/$(PILL). SUTRA_CHECK_MODULE is the attribute name the import
+# binds (almost always "sutra"; a binary that only imports sutra_update,
+# e.g. an update-spine-only tool, sets this to "sutra_update"). Both
+# override per pill.
+#
+# The binary is loaded under a non-"__main__" module name specifically so
+# an `if __name__ == "__main__":` guard does NOT fire during the check --
+# standard practice for anything meant to be imported cleanly, and the
+# same reason SUTRA_CHECK_ARGS/--help exists as a belt-and-suspenders
+# smoke path. A binary whose import-time code does real work unconditionally
+# (no main-guard) cannot be safely loaded this way; tjmax's
+# ModuleNotFoundError/ImportError output-grep remains the correct fallback
+# for exactly that case -- it still runs unconditionally below, first.
 SUTRA_CHECK_BIN ?= src/bin/$(PILL)
 SUTRA_CHECK_ARGS ?= --help
+SUTRA_CHECK_MODULE ?= sutra
+
+# A `define`/`endef` block, not a heredoc inlined into the recipe: GNU Make
+# requires every physical recipe line to either start with a TAB or be a
+# backslash-continuation of one, and a quoted heredoc's body is neither --
+# measured, not assumed (the heredoc form hit "missing separator" the first
+# time this was tried). `define` is Make's own mechanism for a multi-line
+# value; `export` turns it into a real environment variable a subshell can
+# read back with `$$VARNAME`, sidestepping Make's own recipe-line rules
+# entirely for the payload.
+define _SUTRA_CHECK_VENDORED_PATH_PY
+import importlib.util
+import os
+import sys
+from importlib.machinery import SourceFileLoader
+
+bin_path, mod_attr, expected = sys.argv[1], sys.argv[2], sys.argv[3]
+expected = os.path.realpath(expected)
+
+# Two mistakes measured and corrected here, in order:
+#
+# 1. SourceFileLoader/exec_module does not add the loaded file's own
+#    directory to sys.path, and neither does runpy.run_path on its own --
+#    but a real `python3 <bin>` invocation always does, and that is
+#    precisely the mechanism a stale sibling import exploits. Replicated
+#    deliberately below rather than inherited for free.
+# 2. runpy.run_path was tried next and gets (1) right with a manual
+#    sys.path insert, but loses everything on an exception -- no partial
+#    result. A binary whose import-time code does something unrelated
+#    AFTER a successful `import sutra` (tjmax's case, generalized beyond
+#    just a subprocess exit code) would then read as "never bound a name",
+#    indistinguishable from actually missing the import. exec_module
+#    instead updates the module object's namespace incrementally as each
+#    top-level statement runs, so whatever was bound BEFORE a later
+#    exception survives it -- inspect that, rather than treating any
+#    exception as this guard's business.
+bin_dir = os.path.dirname(os.path.abspath(bin_path))
+sys.path.insert(0, bin_dir)
+try:
+    loader = SourceFileLoader("_sutra_check_vendored_path_probe", bin_path)
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    m = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(m)
+    except BaseException:
+        pass
+finally:
+    sys.path.remove(bin_dir)
+
+actual_mod = getattr(m, mod_attr, None)
+if actual_mod is None or not hasattr(actual_mod, "__file__"):
+    print(f"check-vendored-path FAIL: {bin_path!r} never bound a name {mod_attr!r} with a "
+          f"__file__ (missing the bootstrap preamble and the import entirely, or a different "
+          f"attribute name -- set SUTRA_CHECK_MODULE=)")
+    sys.exit(1)
+
+actual = os.path.realpath(actual_mod.__file__)
+if actual != expected:
+    print(f"check-vendored-path FAIL: {bin_path} resolved {mod_attr} to {actual}, expected "
+          f"{expected} -- it imported a DIFFERENT copy (stale sibling? missing bootstrap "
+          f"preamble?)")
+    sys.exit(1)
+
+print(f"check-vendored-path: ok -- {bin_path} resolved {mod_attr} to {actual}")
+endef
+export _SUTRA_CHECK_VENDORED_PATH_PY
 
 .PHONY: check-vendored-path
 check-vendored-path:
 	@[ -n "$(PILL)" ] || { echo "check-vendored-path: set PILL=<pill-name> before including sutra.mk"; exit 1; }
 	@[ -e "$(SUTRA_CHECK_BIN)" ] || { echo "check-vendored-path: no $(SUTRA_CHECK_BIN) -- set SUTRA_CHECK_BIN="; exit 1; }
 	@out=$$(python3 "$(SUTRA_CHECK_BIN)" $(SUTRA_CHECK_ARGS) 2>&1); rc=$$?; \
-	if [ $$rc -ne 0 ]; then \
-	    if echo "$$out" | grep -qE 'ModuleNotFoundError|ImportError'; then \
-	        echo "check-vendored-path FAIL: $(SUTRA_CHECK_BIN) could not import sutra from the checkout:"; \
-	        echo "$$out"; exit 1; \
-	    fi; \
-	    echo "check-vendored-path: $(SUTRA_CHECK_BIN) exited $$rc for reasons unrelated to the" \
-	         "import (no ModuleNotFoundError/ImportError in its output) -- not this guard's" \
-	         "concern, see tjmax msg 1749"; \
+	if [ $$rc -ne 0 ] && echo "$$out" | grep -qE 'ModuleNotFoundError|ImportError'; then \
+	    echo "check-vendored-path FAIL: $(SUTRA_CHECK_BIN) could not import $(SUTRA_CHECK_MODULE) from the checkout:"; \
+	    echo "$$out"; exit 1; \
 	fi; \
-	expected="$$(cd "$(_SUTRA_MK_DIR)" && pwd)/sutra.py"; \
-	bindir="$$(cd "$$(dirname "$(SUTRA_CHECK_BIN)")" && pwd)"; \
-	resolved="$$(dirname "$$bindir")/share/$(PILL)/lib/sutra.py"; \
-	if [ "$$resolved" != "$$expected" ]; then \
-	    echo "check-vendored-path FAIL: $(SUTRA_CHECK_BIN)'s own bootstrap-preamble arithmetic" \
-	         "resolves to $$resolved, but sutra.mk (and the vendored copies beside it) sit at" \
-	         "$$expected -- the checkout's own layout doesn't match what the preamble derives"; \
-	    exit 1; \
-	fi; \
-	[ -f "$$resolved" ] || { echo "check-vendored-path FAIL: resolved path $$resolved doesn't exist"; exit 1; }; \
-	echo "check-vendored-path: ok -- $(SUTRA_CHECK_BIN)'s bootstrap arithmetic resolves to" \
-	     "$$resolved, and it exists"
+	expected="$$(cd "$(_SUTRA_MK_DIR)" && pwd)/$(SUTRA_CHECK_MODULE).py"; \
+	echo "$$_SUTRA_CHECK_VENDORED_PATH_PY" | python3 - "$(SUTRA_CHECK_BIN)" "$(SUTRA_CHECK_MODULE)" "$$expected"

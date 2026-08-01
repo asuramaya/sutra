@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.10.1 — check-vendored-path: a layout check was standing in for a resolution check (2026-08-01)
+
+- 0.10.0's `check-vendored-path` computed the EXPECTED path in shell (from
+  the bootstrap preamble's own formula) and checked that a file exists
+  there. That's a layout check, not a resolution check — it never asked
+  Python what a binary actually imported. Alfred reproduced the gap: a
+  binary that forgot the bootstrap preamble entirely, sitting beside a
+  stale co-located `sutra.py` (the exact pre-migration shape the whole
+  ruling exists to clean up), imports successfully via Python's own
+  same-directory sys.path fallback — and the shell arithmetic still finds
+  a real file at the computed path. Green on the precise regression the
+  guard exists to catch.
+- Fixed: loads the binary as a module for real (`SourceFileLoader` +
+  `exec_module`, with the binary's own directory explicitly inserted into
+  `sys.path` first — neither `exec_module` nor `runpy.run_path` do that on
+  their own, but a real `python3 <bin>` invocation always does, and that's
+  exactly the mechanism a stale sibling exploits) and reads back
+  `<module>.<SUTRA_CHECK_MODULE>.__file__`, the path Python actually
+  resolved. `exec_module` specifically, not `runpy.run_path` (tried and
+  reverted): a binary whose import-time code raises something unrelated
+  *after* a successful import (tjmax's case) needs the partial module
+  state that survived up to that point, which `exec_module` preserves and
+  `run_path` does not.
+- Verified against the exact reproduction: a preamble-less binary next to
+  a stale sibling `sutra.py` now correctly FAILS with a clear diagnostic
+  (resolved path vs. expected path, both shown), and the full regression
+  suite — integrity/DRIFT failures, the happy path, ModuleNotFoundError,
+  and tjmax's unrelated-failure-after-successful-import case — all still
+  pass.
+
 ## 0.10.0 — sutra.mk and pill-ci.yml: recipes get the same guard code already has (2026-08-01)
 
 - Measured across the five pills: 441 lines of hand-copied recipe, `check-sutra`
