@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.12.0 — silent skips made visible, plus two more real defects from real adoptions (2026-08-01)
+
+Three more defects, all found by pills actually adopting sutra.mk/pill-ci.yml
+rather than by sutra validating the artifacts against itself. Landed
+together because defect 7 generalizes the shape underneath the other two
+(and underneath 3/4/6 before them) and changes how they're fixed.
+
+- **Defect 7 (Till/RAMstein, independently tjmax): gated CI steps skipped
+  silently.** `run-attack` defaulted false; RAMstein's `make attack` was
+  never actually run in CI from Till's first pilot commit onward. He ran
+  it by hand every time (it passed) and CI was green every time — neither
+  signal said the check hadn't run in CI at all. He only found it reading
+  `gh api .../jobs/<id> --jq '.steps[]'` directly; tjmax hit the identical
+  wall independently the same morning, because `gh run view`'s default
+  summary renders job-level checkmarks only and a `conclusion: skipped`
+  step is invisible in it. Per Alfred's explicit instruction, NOT fixed by
+  changing any default (no boolean is right for every pill — phanspeed
+  genuinely cannot run attack in CI, four other pills genuinely can).
+  Fixed by removing every step-level `if:` and moving the decision inside
+  each step: the step's own name grows a `-- SKIPPED (reason)` suffix via
+  a name-level expression (evaluated before the run, so it appears in the
+  exact summary view that was blind before) and the run script echoes the
+  same decision for the full log. A gated-off step now always shows
+  `conclusion: success` with a name and an output line that both say so,
+  instead of vanishing. Live-verified: a run with several inputs left at
+  their defaults now shows `Attack (adversarial fuzz) -- SKIPPED
+  (run-attack is false)` directly in `gh run view`'s own summary output.
+- **Defect 5 (maat/kast): `SUTRA_CHECK_BIN`'s default was wrong for 2 of 5
+  pills.** It defaulted to `src/bin/$(PILL)`, but that binary doesn't
+  import sutra for kast (the bash CLI; only kast-update imports it) or
+  phanspeed. A default wrong 40% of the time is a trap: `check-vendored-path`
+  only proved the path *exists*, so a real file with no sutra binding got
+  run through the guard and failed looking like a broken vendor rather
+  than "wrong binary named." No default now — every pill names its own
+  sutra-importing binary explicitly.
+- **Defect 6 (maat/kast): `extension-js` checked only one file.** Every
+  pill has two `.js` files in its extension dir; for kast the second is
+  `prefs.js`, its settings dialog, genuinely uncovered. Same class as the
+  pill.js drop that produced 0.11.0. Fixed: `extension-js` takes a
+  space-separated list, looped one `node --check` per file — measured
+  first that `node --check a.js b.js` is NOT "check both" (node only
+  validates the first positional argument; a real syntax error in a
+  second file exits 0 under a naive word-split fix, which would have been
+  worse than the bug it replaced). Live-verified with a deliberately
+  broken second file: the run correctly fails, naming the right file.
+
+Adoption state at time of writing (per Alfred): phanspeed and kast are on
+0.11.1, ByeByte just re-vendored to it, RAMstein is re-vendoring off
+0.10.1, coldspot has not adopted. Four pills need a re-vendor for defect
+5; only kast currently carries a workaround for defect 6.
+
 ## 0.11.1 — SUTRA_EXT_DIR silently checked nothing: the fix for defect 1 reintroduced defect 1 (2026-08-01)
 
 Found by Werner mid-adoption in a real pill, confirmed by Alfred, three

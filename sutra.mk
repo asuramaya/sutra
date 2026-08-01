@@ -161,11 +161,24 @@ check-sutra-rows:
 # <module>.<SUTRA_CHECK_MODULE>.__file__, the path Python actually
 # resolved, never a second shell computation of what it SHOULD be.
 #
-# SUTRA_CHECK_BIN is the pill-specific part: which binary to run. Defaults
-# to src/bin/$(PILL). SUTRA_CHECK_MODULE is the attribute name the import
-# binds (almost always "sutra"; a binary that only imports sutra_update,
-# e.g. an update-spine-only tool, sets this to "sutra_update"). Both
-# override per pill.
+# SUTRA_CHECK_BIN is the pill-specific part: which binary to run.
+# SUTRA_CHECK_MODULE is the attribute name the import binds (almost always
+# "sutra"; a binary that only imports sutra_update, e.g. an update-spine-
+# only tool, sets this to "sutra_update").
+#
+# DEFECT 5 (maat/kast, msg 2787): SUTRA_CHECK_BIN used to default to
+# src/bin/$(PILL). Measured across five pills: that binary does not import
+# sutra for two of them -- kast's src/bin/kast is the bash CLI (only
+# kast-update imports sutra); phanspeed's src/bin/phanspeed has the same
+# shape. A default that's wrong 40% of the time is a trap, not a default,
+# and the failure it produces is confusing rather than obviously "you
+# configured this wrong": line 262 only proves the path EXISTS, so a real
+# file with no sutra binding gets run through the guard and fails looking
+# like a broken vendor or a missing preamble, when the actual problem is
+# that the wrong binary was named. No default here now -- every pill names
+# its own sutra-importing binary explicitly, because a wrong guess that's
+# sometimes right is worse than no guess: "I didn't set it and it passed"
+# would be indistinguishable from "I set it correctly".
 #
 # SAFETY CORRECTION (Till/RAMstein pilot, escalated by Alfred as family-
 # wide, not RAMstein-specific): the first cut defaulted SUTRA_CHECK_ARGS to
@@ -187,7 +200,7 @@ check-sutra-rows:
 # the resolution check, which never calls main() (a non-"__main__" module
 # name, below) and is therefore safe against ANY binary regardless of how
 # it parses arguments, known-safe flag or not.
-SUTRA_CHECK_BIN ?= src/bin/$(PILL)
+SUTRA_CHECK_BIN ?=
 SUTRA_CHECK_ARGS ?=
 SUTRA_CHECK_MODULE ?= sutra
 
@@ -260,7 +273,8 @@ export _SUTRA_CHECK_VENDORED_PATH_PY
 .PHONY: check-vendored-path
 check-vendored-path:
 	@[ -n "$(PILL)" ] || { echo "check-vendored-path: set PILL=<pill-name> before including sutra.mk"; exit 1; }
-	@[ -e "$(SUTRA_CHECK_BIN)" ] || { echo "check-vendored-path: no $(SUTRA_CHECK_BIN) -- set SUTRA_CHECK_BIN="; exit 1; }
+	@[ -n "$(SUTRA_CHECK_BIN)" ] || { echo "check-vendored-path: set SUTRA_CHECK_BIN=<path-to-your-sutra-importing-binary> -- no default, src/bin/<pill> does not import sutra for every pill (e.g. kast/phanspeed's main CLI)"; exit 1; }
+	@[ -e "$(SUTRA_CHECK_BIN)" ] || { echo "check-vendored-path: no $(SUTRA_CHECK_BIN) -- SUTRA_CHECK_BIN points at a file that doesn't exist"; exit 1; }
 	@if [ -n "$(SUTRA_CHECK_ARGS)" ]; then \
 	    out=$$(python3 "$(SUTRA_CHECK_BIN)" $(SUTRA_CHECK_ARGS) 2>&1); rc=$$?; \
 	    if [ $$rc -ne 0 ] && echo "$$out" | grep -qE 'ModuleNotFoundError|ImportError'; then \

@@ -18,6 +18,8 @@
 #         shellcheck-files: "install.sh uninstall.sh tests/smoke.sh"
 #         has-extension: true
 #         extension-js: "src/extension/coldspot@asuramaya/extension.js"
+#         # kast, which also has a prefs dialog, would instead pass:
+#         #   extension-js: "src/extension/kast@asuramaya/extension.js src/extension/kast@asuramaya/prefs.js"
 #         extension-metadata: "src/extension/coldspot@asuramaya/metadata.json"
 #         man-pages: "src/data/man/man1/coldspot.1 src/data/man/man8/coldspotd.8"
 #
@@ -37,6 +39,20 @@
 #      the exact thing check-version tests for. Adopting with defaults
 #      would have hard-failed every pill's first CI run. Defaulted to
 #      false; sutra itself is still the only real consumer.
+#
+# DEFECT 6 (maat, kast, msg 2787): extension-js checked only ONE file.
+# Every pill has two .js files in its extension dir; for four of them the
+# second is pill.js (covered separately via sutra.mk's SUTRA_EXT_DIR), but
+# kast's second file is prefs.js, its settings dialog -- genuinely
+# uncovered, and verbatim adoption would have silently dropped its syntax
+# check. Same class as defect 1 (pill.js): any pill with a second entry
+# point loses coverage silently. Fixed: extension-js takes a space-
+# separated list, looped one `node --check` per file (measured: `node
+# --check a.js b.js` is not "check both" -- node only validates the first
+# positional argument as a script, anything after it becomes that script's
+# own argv and is never parsed; a real syntax error in a second file would
+# have exited 0 under a naive word-split fix, which is worse than the bug
+# it replaces).
 # Pin question, decided and documented per the ask rather than left
 # implicit: PIN TO A COMMIT SHA, not @main and not a tag. Not @main --
 # every adopting pill's CI would move the instant this file changes, with
@@ -79,7 +95,12 @@ on:
         type: boolean
         default: false
       extension-js:
-        description: Path to the extension's main .js (required if has-extension).
+        description: >-
+          Space-separated .js files to syntax-check with `node --check`
+          (required if has-extension) -- every file in the extension dir
+          that ships as its own script, not just extension.js. A pill
+          with a prefs dialog (kast's prefs.js) or any other second entry
+          point needs it listed here too, or it silently loses coverage.
         type: string
         default: ""
       extension-metadata:
@@ -125,49 +146,128 @@ jobs:
       - name: Repo structure gate (REPO-STANDARD.md)
         run: make check-repo
 
-      - name: Python (syntax)
-        if: inputs.python-files != ''
-        run: python3 -m py_compile ${{ inputs.python-files }}
+      # DEFECT 7 (Till, RAMstein, and independently tjmax, msg 2791 via
+      # Alfred): every step below used to gate with a step-level `if:`.
+      # GitHub Actions marks a gated-off step `conclusion: skipped` --
+      # accurate, but INVISIBLE in `gh run view`'s default summary, which
+      # renders job-level checkmarks only. Till's run-attack was false
+      # from his first pilot commit onward; he ran attack by hand every
+      # time (it passed) and CI was green every time, and neither signal
+      # said the check had not actually run in CI. He only found it via
+      # `gh api .../jobs/<id> --jq '.steps[]'`, reading conclusion
+      # directly; tjmax hit the identical wall independently the same
+      # morning. Generalizes defects 3/4/6 rather than sitting beside
+      # them -- ANY gated step has this shape, current and future.
+      #
+      # Alfred's explicit instruction: do not "fix" this by changing a
+      # default -- no boolean is right for every pill (run-attack: true
+      # would fail phanspeed, which genuinely cannot run it in CI; false
+      # is wrong for the four pills that can). The defect is that the
+      # skip is silent, not that any particular default is wrong.
+      #
+      # Fixed by removing every step-level `if:` and moving the decision
+      # inside the step, in TWO places at once: the step's own NAME grows
+      # a "-- SKIPPED (reason)" suffix via a name-level expression
+      # (evaluated before the run, so it renders in the exact summary
+      # view that was blind before), and the run script echoes the same
+      # decision for anyone reading the full log. A step that's gated off
+      # now always shows conclusion: success with a name and an output
+      # line that both say so, instead of vanishing.
 
-      - name: Shell (syntax)
-        if: inputs.shell-files != ''
-        run: bash -n ${{ inputs.shell-files }}
+      - name: Python (syntax)${{ inputs.python-files == '' && ' -- SKIPPED (python-files not set)' || '' }}
+        run: |
+          if [ -n "${{ inputs.python-files }}" ]; then
+            python3 -m py_compile ${{ inputs.python-files }}
+          else
+            echo "python (syntax): SKIPPED (python-files not set)"
+          fi
 
-      - name: Shellcheck
-        if: inputs.shellcheck-files != ''
-        run: shellcheck ${{ inputs.shellcheck-exclude != '' && format('-e {0}', inputs.shellcheck-exclude) || '' }} ${{ inputs.shellcheck-files }}
+      - name: Shell (syntax)${{ inputs.shell-files == '' && ' -- SKIPPED (shell-files not set)' || '' }}
+        run: |
+          if [ -n "${{ inputs.shell-files }}" ]; then
+            bash -n ${{ inputs.shell-files }}
+          else
+            echo "shell (syntax): SKIPPED (shell-files not set)"
+          fi
 
-      - name: Sutra vendor drift guard
-        if: inputs.run-check-sutra
-        run: make check-sutra
+      - name: Shellcheck${{ inputs.shellcheck-files == '' && ' -- SKIPPED (shellcheck-files not set)' || '' }}
+        run: |
+          if [ -n "${{ inputs.shellcheck-files }}" ]; then
+            shellcheck ${{ inputs.shellcheck-exclude != '' && format('-e {0}', inputs.shellcheck-exclude) || '' }} ${{ inputs.shellcheck-files }}
+          else
+            echo "shellcheck: SKIPPED (shellcheck-files not set)"
+          fi
 
-      - name: GNOME extension (syntax)
-        if: inputs.has-extension
-        run: node --check "${{ inputs.extension-js }}"
+      - name: Sutra vendor drift guard${{ inputs.run-check-sutra == false && ' -- SKIPPED (run-check-sutra is false)' || '' }}
+        run: |
+          if [ "${{ inputs.run-check-sutra }}" = "true" ]; then
+            make check-sutra
+          else
+            echo "check-sutra: SKIPPED (run-check-sutra is false)"
+          fi
 
-      - name: GNOME extension metadata (valid JSON)
-        if: inputs.has-extension && inputs.extension-metadata != ''
-        run: python3 -c "import json; json.load(open('${{ inputs.extension-metadata }}'))"
+      # `node --check a.js b.js` is NOT "check both" -- node only
+      # validates the first positional argument as a script; anything
+      # after it becomes that script's own argv and is never parsed at
+      # all. Measured: a real syntax error in a second file exits 0.
+      # Loop instead, one `node --check` per file.
+      - name: GNOME extension (syntax)${{ inputs.has-extension == false && ' -- SKIPPED (has-extension is false)' || '' }}
+        run: |
+          if [ "${{ inputs.has-extension }}" = "true" ]; then
+            for f in ${{ inputs.extension-js }}; do
+              node --check "$f"
+            done
+          else
+            echo "extension (syntax): SKIPPED (has-extension is false)"
+          fi
 
-      - name: man page (syntax)
-        # -t -k, not just -Tutf8 -ww: the bare form exits 0 while silently
-        # skipping the table and UTF-8 preprocessor passes, so a malformed
-        # table would render clean (family hardening, Alfred msg 1628).
-        if: inputs.man-pages != ''
-        run: groff -t -k -man -Tutf8 -ww ${{ inputs.man-pages }} > /dev/null
+      - name: GNOME extension metadata (valid JSON)${{ (inputs.has-extension == false || inputs.extension-metadata == '') && ' -- SKIPPED (has-extension is false, or extension-metadata not set)' || '' }}
+        run: |
+          if [ "${{ inputs.has-extension }}" = "true" ] && [ -n "${{ inputs.extension-metadata }}" ]; then
+            python3 -c "import json; json.load(open('${{ inputs.extension-metadata }}'))"
+          else
+            echo "extension metadata (valid JSON): SKIPPED (has-extension is false, or extension-metadata not set)"
+          fi
 
-      - name: Smoke
-        if: inputs.run-smoke
-        run: make smoke
+      # -t -k, not just -Tutf8 -ww: the bare form exits 0 while silently
+      # skipping the table and UTF-8 preprocessor passes, so a malformed
+      # table would render clean (family hardening, Alfred msg 1628).
+      - name: man page (syntax)${{ inputs.man-pages == '' && ' -- SKIPPED (man-pages not set)' || '' }}
+        run: |
+          if [ -n "${{ inputs.man-pages }}" ]; then
+            groff -t -k -man -Tutf8 -ww ${{ inputs.man-pages }} > /dev/null
+          else
+            echo "man page (syntax): SKIPPED (man-pages not set)"
+          fi
 
-      - name: Attack (adversarial fuzz)
-        if: inputs.run-attack
-        run: make attack
+      - name: Smoke${{ inputs.run-smoke == false && ' -- SKIPPED (run-smoke is false)' || '' }}
+        run: |
+          if [ "${{ inputs.run-smoke }}" = "true" ]; then
+            make smoke
+          else
+            echo "smoke: SKIPPED (run-smoke is false)"
+          fi
 
-      - name: Check-version
-        if: inputs.run-check-version
-        run: make check-version
+      - name: Attack (adversarial fuzz)${{ inputs.run-attack == false && ' -- SKIPPED (run-attack is false)' || '' }}
+        run: |
+          if [ "${{ inputs.run-attack }}" = "true" ]; then
+            make attack
+          else
+            echo "attack: SKIPPED (run-attack is false)"
+          fi
 
-      - name: Release-signing verify path
-        if: inputs.run-signing-verify
-        run: bash tests/test_signing.sh
+      - name: Check-version${{ inputs.run-check-version == false && ' -- SKIPPED (run-check-version is false)' || '' }}
+        run: |
+          if [ "${{ inputs.run-check-version }}" = "true" ]; then
+            make check-version
+          else
+            echo "check-version: SKIPPED (run-check-version is false)"
+          fi
+
+      - name: Release-signing verify path${{ inputs.run-signing-verify == false && ' -- SKIPPED (run-signing-verify is false)' || '' }}
+        run: |
+          if [ "${{ inputs.run-signing-verify }}" = "true" ]; then
+            bash tests/test_signing.sh
+          else
+            echo "signing-verify: SKIPPED (run-signing-verify is false)"
+          fi
