@@ -128,9 +128,33 @@ on:
         type: boolean
         default: false
       run-signing-verify:
-        description: Runs `bash tests/test_signing.sh` if true.
+        description: >-
+          Gates the release-signing verify step. Requires
+          signing-verify-command to be set to something non-empty when
+          true -- there is no default command, see that input's own
+          description for why.
         type: boolean
         default: false
+      signing-verify-command:
+        description: >-
+          DEFECT 8 (Aegis, msg 2848 via Alfred): this used to be
+          hardcoded as `bash tests/test_signing.sh`. Measured across the
+          family, that path is wrong for half of the pills that have a
+          signing test at all -- coldspot and phanspeed use
+          tests/test_signing.py, not .sh, and both were locked out of
+          this shared step, hand-rolling a sibling job instead. Same
+          shape as defect 5 (SUTRA_CHECK_BIN): a hardcoded guess wrong
+          for a large minority is not a shortcut, it is silent opt-out
+          pressure on exactly the pills the shared step was supposed to
+          cover. No default here either, and no .py-vs-.sh special
+          casing -- that would just be a cleverer guess, the same trap.
+          Set this to the pill's actual command in full, e.g.
+          "bash tests/test_signing.sh" or "python3
+          tests/test_signing.py" or anything else; pill-ci.yml never
+          needs to know the taxonomy. Ignored when run-signing-verify is
+          false.
+        type: string
+        default: ""
 
 jobs:
   shared:
@@ -267,7 +291,11 @@ jobs:
       - name: Release-signing verify path${{ inputs.run-signing-verify == false && ' -- SKIPPED (run-signing-verify is false)' || '' }}
         run: |
           if [ "${{ inputs.run-signing-verify }}" = "true" ]; then
-            bash tests/test_signing.sh
+            if [ -z "${{ inputs.signing-verify-command }}" ]; then
+              echo "signing-verify FAIL: run-signing-verify is true but signing-verify-command is empty -- set it to this pill's actual command (e.g. \"bash tests/test_signing.sh\" or \"python3 tests/test_signing.py\"); no default is guessed, see the input's own description"
+              exit 1
+            fi
+            ${{ inputs.signing-verify-command }}
           else
             echo "signing-verify: SKIPPED (run-signing-verify is false)"
           fi

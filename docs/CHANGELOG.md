@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.12.3 — defect 8: signing-verify hardcoded a filename that's wrong for half the family (2026-08-01)
+
+Found by Aegis adopting pill-ci.yml, reported via Alfred (msg 2848).
+`run-signing-verify` hardcoded `bash tests/test_signing.sh`. Measured
+across the family: ByeByte and kast use `tests/test_signing.sh`, but
+coldspot and phanspeed use `tests/test_signing.py` — two of the four
+pills with a signing test at all were locked out of the shared step and
+had to hand-roll a sibling job to run it. Same shape as defect 5
+(`SUTRA_CHECK_BIN`): a hardcoded guess wrong for a large minority isn't
+a shortcut, it's silent opt-out pressure on exactly the pills the shared
+step exists to cover.
+
+- **New `signing-verify-command` input** takes the pill's full command
+  (`"bash tests/test_signing.sh"`, `"python3 tests/test_signing.py"`, or
+  anything else) — `pill-ci.yml` never needs to know the taxonomy. No
+  `.py`-vs-`.sh` special-casing: that would just be a cleverer guess,
+  the same trap the family already ruled out once.
+- **No default, consistent with the doctrine** `SUTRA_CHECK_BIN`/
+  `SUTRA_CHECK_ARGS` already set: `run-signing-verify: true` with an
+  empty `signing-verify-command` now fails loudly (`exit 1` with a
+  named cause) instead of guessing a filename.
+- **`run-signing-verify`'s own description** no longer asserts the
+  hardcoded command — same doc-can't-assert-stale-output class as
+  0.12.2, caught before it shipped this time rather than after.
+- **Audited the rest of the workflow** for the same shape (build item
+  4): every other check-step routes through a `make <target>` the pill
+  itself implements (`check-repo`, `check-sutra`, `smoke`, `attack`,
+  `check-version`) — Make already abstracts the per-pill
+  language/filename choice, so signing-verify's bare script path was
+  the only step actually bypassing that convention. Nothing else in the
+  file has this shape.
+
+Verified: `python3 -c "import yaml; yaml.safe_load(open(...))"` parses
+clean; the new input follows the exact same `${{ inputs.x }}`
+substitution-into-`run:` pattern already proven by `python-files`/
+`shell-files`/`shellcheck-files` above it. Could not live-exercise the
+reusable workflow itself — sutra's own `ci.yml` doesn't call
+`pill-ci.yml`, and by the pin-per-commit-SHA design (see this file's own
+header) no pill's CI is affected until it explicitly re-pins. ByeByte,
+kast, coldspot and phanspeed notified that the shared step is available
+so their hand-rolled signing-verify sibling jobs can collapse back into
+it; their repos not touched here.
+
+No vendored module touched. Not sealed — release block still holds.
+
 ## 0.12.2 — the "which prints" transcript was itself stale (2026-08-01)
 
 Doc-only, found by Alfred verifying 0.12.1 independently rather than
