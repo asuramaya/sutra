@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.11.1 — SUTRA_EXT_DIR silently checked nothing: the fix for defect 1 reintroduced defect 1 (2026-08-01)
+
+Found by Werner mid-adoption in a real pill, confirmed by Alfred, three
+pills blocked pending this. `check-sutra`'s pill.js branch tested
+`$(SUTRA_EXT_DIR)` — Make-level, correct — but then read the value back as
+`$${SUTRA_EXT_DIR%/}` — shell-level, and `SUTRA_EXT_DIR` was never exported
+to the recipe's shell. The `-n` test correctly saw a non-empty value and
+took the branch; `extdir` then resolved to nothing, the pill.js path
+collapsed to `/pill.js`, and the existing not-vendored-here fallback
+reported a clean skip. `check-sutra` exited 0 while covering nothing — the
+exact defect 0.11.0's `SUTRA_EXT_DIR` fix exists to close, reintroduced
+inside its own fix, and worse than an ordinary failure because it reads as
+routine output ("skipping pill.js") rather than a red run.
+
+Fixed: `extdir` now resolves via `$(patsubst %/,%,$(SUTRA_EXT_DIR))`,
+Make-level throughout, removing the export/parse-order question entirely
+rather than requiring a pill to `export SUTRA_EXT_DIR` around the include
+(Werner's local workaround). Swept the rest of `sutra.mk` for the same
+$(VAR)-tested-vs-$${VAR}-read shape — isolated to this one branch;
+`check-vendored-path`'s `SUTRA_CHECK_BIN`/`SUTRA_CHECK_MODULE` are
+consistently `$(...)` throughout.
+
+The regression suite that shipped 0.11.0 passed this bug, and the reason
+is itself worth recording: it exercised `SUTRA_EXT_DIR` via a `make
+VAR=value` command-line override, which GNU Make auto-exports to the
+recipe's shell — masking exactly the gap a real pill hits, since a real
+pill sets `SUTRA_EXT_DIR := ...` as a Makefile-internal assignment before
+`include`, the same way `PILL` itself is set, which is never
+auto-exported. Reproduced the failure via that real pattern first, then
+added a positive assertion that pill.js was actually checked (not merely
+that the run exited 0) — "skipped" and "passed" are different outcomes and
+only one is coverage; that assertion is the one that would have caught
+this the first time.
+
 ## 0.11.0 — four defects from RAMstein's real pilot adoption, plus a safety fix escalated family-wide (2026-08-01)
 
 Till's RAMstein pilot (msg 2739 via Alfred) is the first REAL, independently-
