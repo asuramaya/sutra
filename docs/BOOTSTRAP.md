@@ -74,14 +74,100 @@ handed to it and never hardcodes one. Verified against a simulated
 co-install of two pills under one prefix, and separately under two
 different prefixes, before publishing — not just reasoned through.
 
-## The canonical check-sutra recipe
+## The recipe layer: sutra.mk
 
-The bootstrap preamble above is half of what a pill needs to vendor sutra
-correctly; the other half is verifying, on an ongoing basis, that the
-vendored copy hasn't gone stale or been hand-edited. That verification —
-`check-sutra` — has the same re-derivation problem the preamble did: left to
-each pill, five pills produced five variants, and four of them share the same
-bug. Publishing it here, once, is the fix, the same way the preamble was.
+The bootstrap preamble above gets a binary importing the right file.
+Verifying it *stays* right — integrity, freshness, and that a running
+binary actually resolved to the vendored copy, not a stale sibling — is
+the other half, and it has the same re-derivation problem the preamble
+had: left to each pill, five pills wrote five variants of the same
+~100 lines, and every real divergence the family has hit since has been
+in this recipe layer, never in the vendored code itself (which has a
+hash anchor and cannot silently drift — see docs/ARCHITECTURE.md).
+`sutra.mk` is that recipe layer published once and vendored like code,
+under its own `.version`/`.commit` anchor pair — see the file's own
+header for the include mechanics and every pilot correction it has
+absorbed since.
+
+**This is the adopted route.** A pill's root `Makefile`:
+
+```makefile
+PILL := <pill-name>
+SUTRA_EXT_DIR := src/extension/<pill-name>@asuramaya   # only if the pill vendors pill.js
+SUTRA_CHECK_BINS := <bin> <bin> <bin>:sutra_update      # every binary that imports sutra
+include src/share/<pill-name>/lib/sutra.mk
+```
+
+`PILL` must be set before the `include` line; everything sutra.mk needs
+after that resolves relative to its *own* vendored location
+(`$(lastword $(MAKEFILE_LIST))` at include-time), never to the including
+Makefile's. The fully-adopted reference, nothing hand-rolled left, is
+`RAMstein/Makefile:10-36`:
+
+```makefile
+PILL := ramstein
+SUTRA_EXT_DIR := src/extension/ramstein@asuramaya
+SUTRA_CHECK_BINS := src/bin/ramsteind src/bin/ramstein src/bin/ramstein-healthcheck src/bin/ramstein-update:sutra_update
+include src/share/ramstein/lib/sutra.mk
+```
+
+The include brings in `check-sutra` (integrity + freshness for the
+vendored `.py` files, and `pill.js` when `SUTRA_EXT_DIR` is set) and
+`check-vendored-path` / `check-vendored-path-all` (proves a real binary's
+import actually *resolved* to the vendored copy — a file-exists check at
+the expected path is a weaker claim, and the gap between the two is a
+real regression sutra.mk's own header documents). None of these take a
+pill-supplied guess for the thing that genuinely varies per pill — three
+real adoptions have already hit why, below.
+
+### Three things sutra.mk deliberately has no default for
+
+1. **`SUTRA_CHECK_BIN` / `SUTRA_CHECK_BINS` — which binary actually
+   imports sutra.** Not `src/bin/$(PILL)`: measured across five pills,
+   that guess is wrong for two of them — kast's `src/bin/kast` is the
+   bash CLI (only `kast-update` imports sutra); phanspeed's
+   `src/bin/phanspeed` has the same shape. A default wrong 40% of the
+   time is a trap, not a default — the failure it produces reads as "the
+   vendor is broken" when the real problem is "named the wrong binary"
+   (defect 5, msg 2787). Name every sutra-importing binary explicitly;
+   reach for `SUTRA_CHECK_BINS` (space-separated, each entry `path` or
+   `path:module`) the moment there's more than one.
+2. **`SUTRA_CHECK_ARGS` — no flag is safe by assumption.** The first cut
+   defaulted to `--help` as universally safe. It is not: three of
+   RAMstein's four binaries hand-roll their own argument parsing instead
+   of using `argparse`, so an unrecognized `--help` falls through to
+   their *default verb* — for `ramstein`/`ramstein-healthcheck` that
+   means `make check` makes a REAL socket call to the LIVE daemon, every
+   run. Harmless under RAMstein's own security model; a pill whose
+   default verb has a non-idempotent side effect would have this guard
+   perform it silently, forever. Left empty (the default), the
+   real-subprocess sanity call is skipped entirely and the guard relies
+   only on the resolution check, which never calls the binary's `main()`
+   and is safe regardless of how it parses arguments. Set it only to a
+   flag *that binary's own author* has verified is safe and idempotent —
+   phanspeed's `--selftest`/`--check` is the model, not a generic flag
+   picked from habit.
+3. **`pill.js` needs `SUTRA_EXT_DIR` set, not a hand-extended loop.** The
+   fallback recipe below predates sutra.mk and says to extend its own
+   `for mod in ...` line if you vendor `pill.js` — correct only if you
+   are actually using that raw shell fallback. Under `sutra.mk`, setting
+   `SUTRA_EXT_DIR` to the pill's extension directory opts `check-sutra`
+   into covering `pill.js` natively; leaving it unset (the default)
+   skips it, exactly as a pill with no extension should. Hand-extending
+   a loop *underneath* sutra.mk instead of setting this variable
+   reintroduces the exact gap defect 1 closed, invisibly.
+
+## The hand-written fallback recipe (no Makefile)
+
+Everything above assumes a pill can `include` a Makefile. A pill that
+cannot still needs the same integrity + freshness verification
+`sutra.mk`'s `check-sutra` provides — this is that logic in raw shell,
+kept for that case only. **Prefer `sutra.mk` above whenever a Makefile is
+available**: this form has none of `sutra.mk`'s conventions
+(`SUTRA_EXT_DIR`, `SUTRA_CHECK_BIN`/`SUTRA_CHECK_BINS`, the three
+no-default traps above, `check-vendored-path`) built in — you carry that
+plumbing yourself, by hand, which is exactly the re-derivation problem
+`sutra.mk` exists to close.
 
 ```makefile
 check-sutra:
@@ -125,7 +211,11 @@ check-sutra:
 (`src/share/<pill>/lib/` in a repo checkout — see below); `<ext-dir>` and
 `<pill>` are only used inside the re-vendor hint. Extend the `for mod in ...`
 line with `pill.js` (and point `py`/`ver`/`cmt` at the extension dir instead)
-if the pill also vendors it there.
+if the pill also vendors it there **and is using this raw fallback, not
+sutra.mk** — under sutra.mk, set `SUTRA_EXT_DIR` before the `include`
+instead (above); hand-extending this loop underneath sutra.mk does nothing
+(sutra.mk's own `check-sutra` target shadows this one in the Makefile) and
+signals the wrong mental model to the next reader.
 
 **Integrity** is the hard gate: a mismatched sha256 means the copy was
 hand-edited or corrupted, full stop, `fail=1`, no LAG/DRIFT nuance applies.
@@ -180,11 +270,15 @@ Obligation thread `20819d5a` tracks the coordinated pass. Per repo:
   package-owned files automatically; `install.sh`'s old copies are owned
   by nothing and would linger forever otherwise.
 - **The installed copy should be checkable**, not just the source-tree
-  one: `check-sutra` today verifies `src/bin/sutra.py` against
-  `src/bin/sutra.version` (the *dev-tree* copy) — the same sha256/anchor
-  logic applies unchanged to the *installed* copy, just pointed at
-  `$SHAREDIR/lib/sutra.py` / `$SHAREDIR/lib/sutra.version` instead. A
-  guard that only ever reads the dev-tree copy while the machine runs a
+  one: `check-sutra` (whether via `sutra.mk` or the hand-written
+  fallback) verifies `src/share/<pill>/lib/sutra.py` against
+  `src/share/<pill>/lib/sutra.version` — the *dev-tree* copy in a repo
+  checkout. The same sha256/anchor logic applies unchanged to the
+  *installed* copy, just pointed at `$SHAREDIR/lib/sutra.py` /
+  `$SHAREDIR/lib/sutra.version` instead — sutra.mk's `check-sutra` has no
+  built-in way to point at an installed prefix today, so this is on the
+  pill to wire up if it wants the installed copy covered too. A guard
+  that only ever reads the dev-tree copy while the machine runs a
   different installed copy is the same blind spot the collision itself
   exploited, one layer out.
 - **`make smoke` should run a binary straight from the checkout**, not

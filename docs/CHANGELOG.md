@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.12.1 — BOOTSTRAP.md catches up to sutra.mk (2026-08-01)
+
+Doc-only pass, no behavior change to sutra.py/sutra_update.py/sutra_xen.py/
+pill.js. Found by Alfred by accident while checking something else (msg
+2819): `grep -c "sutra\.mk" docs/BOOTSTRAP.md` was `0`. BOOTSTRAP.md is the
+canonical document every pill reads on adoption, and it still presented the
+hand-written `check-sutra` shell recipe as *the* recipe, silent on
+`sutra.mk` existing at all — the doc-layer instance of the same drift class
+0.11.0–0.12.0 kept finding in the recipe layer itself. Measured consequence:
+gestalt's Makefile carries a comment justifying a hand-rolled `pill.js`
+supplement by citing BOOTSTRAP.md's own "extend the `for mod in ...` line"
+instruction — correct for 0.10.1-era gestalt, false at 0.12.0 where
+`SUTRA_EXT_DIR` does that natively.
+
+- **`sutra.mk` is now documented as the adopted route.** New "The recipe
+  layer: sutra.mk" section: the `PILL` / `SUTRA_EXT_DIR` /
+  `SUTRA_CHECK_BIN(S)` / `include` shape, with `RAMstein/Makefile:10-36`
+  cited as the fully-adopted reference (nothing hand-rolled left).
+- **The three no-default traps now live in the doc itself**, not only in
+  sutra.mk's own comments: `SUTRA_CHECK_BIN`/`SUTRA_CHECK_BINS` has no
+  default (defect 5 — `src/bin/$(PILL)` is wrong for kast/phanspeed);
+  `SUTRA_CHECK_ARGS` has no default (a `--help` default made RAMstein's
+  guard issue a real socket call to the live daemon on every `make check`);
+  `pill.js` wants `SUTRA_EXT_DIR` set, not a hand-extended loop underneath
+  sutra.mk.
+- **The hand-written recipe stays, demoted and relabeled** "The
+  hand-written fallback recipe (no Makefile)" — still needed for a pill
+  that can't `include` a Makefile at all, no longer presented as the
+  default path.
+- **A stale path reference fixed in passing**: the "installed copy should
+  be checkable" bullet still cited `src/bin/sutra.py` as the dev-tree
+  location, predating the move to `src/share/<pill>/lib/` — corrected to
+  match the convention the rest of the document already uses.
+
+`grep -c "sutra\.mk" docs/BOOTSTRAP.md` is `19` after this pass. Scope was
+deliberately docs/recipe-layer only, per Alfred's explicit constraint — a
+code change to any of the four vendored files obliges a re-vendor across
+seven repos, not opened here. Not sealed: sutra's release block (thread
+per docs/RELEASING.md) still holds pending sutra/mudra convergence: this is
+a version bump and changelog entry only, no tag.
+
 ## 0.12.0 — silent skips made visible, plus two more real defects from real adoptions (2026-08-01)
 
 Three more defects, all found by pills actually adopting sutra.mk/pill-ci.yml
