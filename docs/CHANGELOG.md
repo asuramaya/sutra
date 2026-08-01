@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.10.0 — sutra.mk and pill-ci.yml: recipes get the same guard code already has (2026-08-01)
+
+- Measured across the five pills: 441 lines of hand-copied recipe, `check-sutra`
+  alone ranging 30–57 lines for what was nominally one thing. Vendored CODE has
+  never drifted once (hash anchors make it impossible); vendored RECIPES have
+  produced every divergence the family has hit — the corrected `check-sutra`
+  freshness fix reached one of five pills, the row-count arithmetic came out
+  wrong in three different ways, the vendor path trapped three of four seats.
+  This release gives recipes the same mechanical guard code already has.
+- New `sutra.mk`, vendored via `vendor.sh` under its own `.version`/`.commit`
+  anchor pair alongside the code files, `include`able from a pill's own root
+  Makefile (`PILL := <pill>; include src/share/<pill>/lib/sutra.mk`). Carries
+  the corrected per-file-head `check-sutra` (integrity as sha256-vs-`.version`,
+  freshness as LAG/DRIFT against each vendored file's own last-modifying
+  commit, never sutra's repo HEAD — decision `325b1969`), the row-count
+  primitive (`git ls-files | cut -d/ -f1 | sort -u | wc -l`, not a
+  hand-maintained skip-list), and a checkout-run guard proving a pill's real
+  binary resolves its vendored `sutra.py` to the exact expected path rather
+  than merely exiting 0 (Till's form, b211651) while not penalizing a binary
+  that legitimately can't run in a hardware-free CI runner for unrelated
+  reasons (tjmax's refinement, msg 1749). Verified with a scratch integration
+  test (a fake pill vendoring sutra + `sutra.mk` end to end, both happy-path
+  and every failure branch exercised) — not just reasoned through.
+- New `.github/workflows/pill-ci.yml`, a reusable `on: workflow_call` workflow
+  covering the shared CI core (structure gate first, python/shell syntax,
+  `check-sutra`, optional extension/man-page checks, smoke/attack/check-version,
+  optional signing verify) — the strongest of the three recipe-guard layers,
+  since GitHub resolves `uses:` at run time: a fix here reaches every adopting
+  pill's next run with zero pill-side commits. Pinned by commit SHA, not
+  `@main` (uncontrolled blast radius across every pill's CI at once) or a tag
+  (sutra cuts none yet — sealing stays blocked until sutra/mudra converge);
+  revisit tag-pinning once sutra starts cutting releases. Live-verified against
+  a real GitHub Actions run on a scratch branch, exercising both the
+  shared-step path and the conditional-skip path, not just YAML-parsed.
+- `sutra.mk` sitting at repo root adds a fifteenth row (it's a product file
+  the same way the other five are, not documentation or packaging glue) —
+  `docs/ARCHITECTURE.md`'s exemptions table and `check-repo`'s cap both
+  updated from fourteen to fifteen accordingly. Caught by the live
+  `pill-ci.yml` test itself running `make check-repo` against this repo,
+  not found ahead of time.
+- Per operator ruling, sutra still cuts no tagged release: sealing stays
+  blocked until sutra and mudra converge on this same pass. `sutra.mk`/
+  `pill-ci.yml` adoption into any pill is explicitly not this repo's to do —
+  sequenced by Alfred once both artifacts exist.
+
 ## 0.9.0 — REPO-STANDARD catch-up: fourteen rows, check-repo, recipes stop being copied by hand (2026-08-01)
 
 - sutra converges on the family's REPO-STANDARD.md: root goes from

@@ -28,7 +28,8 @@ check-version:
 #     pill.js never appear in its grep list), because sutra's whole point is
 #     that those four carry their OWN version constants, deliberately,
 #     alongside packaging/VERSION -- see the exemptions table.
-# The row cap is 14, not the family default of 12, per the same table.
+# The row cap is 15, not the family default of 12, per the same table
+# (fourteen from the initial REPO-STANDARD pass, plus one for sutra.mk).
 check-repo:
 	@fail=0; \
 	for f in README.md LICENSE Makefile install.sh uninstall.sh .gitignore .gitattributes \
@@ -38,8 +39,8 @@ check-repo:
 	    fi; \
 	done; \
 	rows=$$(git ls-files | cut -d/ -f1 | sort -u | wc -l); \
-	if [ "$$rows" -gt 14 ]; then \
-	    echo "check-repo FAIL: root has $$rows rows, sutra's exemption-justified cap is 14"; fail=1; \
+	if [ "$$rows" -gt 15 ]; then \
+	    echo "check-repo FAIL: root has $$rows rows, sutra's exemption-justified cap is 15"; fail=1; \
 	else \
 	    echo "check-repo: root row count ok ($$rows)"; \
 	fi; \

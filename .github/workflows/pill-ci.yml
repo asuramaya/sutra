@@ -1,0 +1,137 @@
+# pill-ci.yml -- the family's shared CI core, reusable via `on: workflow_call`
+# rather than copied by hand. GitHub resolves the `uses:` reference at RUN
+# TIME, so a fix landed here reaches every adopting pill's very next run
+# with zero pill-side commits and no re-vendor wave -- the strongest of the
+# three recipe-guard layers (sutra.mk is the second; see docs/ARCHITECTURE.md
+# and docs/BOOTSTRAP.md). Covers the steps every pill shares; whatever is
+# genuinely pill-specific (a bespoke lint exclusion list, an extra fuzz
+# target) stays as a sibling job in the calling pill's own ci.yml -- this
+# workflow was never meant to be literally everything.
+#
+# A pill's ci.yml becomes, at minimum:
+#
+#   jobs:
+#     shared:
+#       uses: asuramaya/sutra/.github/workflows/pill-ci.yml@<pinned-sha>
+#       with:
+#         python-files: "src/bin/coldspot src/bin/coldspotd"
+#         has-extension: true
+#         extension-js: "src/extension/coldspot@asuramaya/extension.js"
+#         extension-metadata: "src/extension/coldspot@asuramaya/metadata.json"
+#         man-pages: "src/data/man/man1/coldspot.1 src/data/man/man8/coldspotd.8"
+#
+# Pin question, decided and documented per the ask rather than left
+# implicit: PIN TO A COMMIT SHA, not @main and not a tag. Not @main --
+# every adopting pill's CI would move the instant this file changes, with
+# no propagation step and no way to catch a bad edit before it's live
+# everywhere at once (exactly the uncontrolled blast radius Layer 3's own
+# design deliberately avoids by needing an explicit PR per pill). Not a
+# tag either, at least not yet -- sutra cuts no tagged release until sutra
+# and mudra converge (operator ruling; docs/RELEASING.md), so there is no
+# tag to pin to today. A commit SHA gives the same immutability and control
+# a tag would, works right now, and should move to tag-pinning once sutra
+# starts cutting releases (revisit then, not before).
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        type: string
+        default: ubuntu-latest
+      python-files:
+        description: Space-separated files for `python3 -m py_compile`. Empty skips the step.
+        type: string
+        default: ""
+      shell-files:
+        description: Space-separated files for `bash -n`. Empty skips the step.
+        type: string
+        default: ""
+      has-extension:
+        description: Whether this pill ships a GNOME Shell extension.
+        type: boolean
+        default: false
+      extension-js:
+        description: Path to the extension's main .js (required if has-extension).
+        type: string
+        default: ""
+      extension-metadata:
+        description: Path to the extension's metadata.json. Empty skips the JSON-validity check.
+        type: string
+        default: ""
+      man-pages:
+        description: Space-separated man page paths, checked with groff -t -k -man -Tutf8 -ww. Empty skips the step.
+        type: string
+        default: ""
+      run-check-sutra:
+        type: boolean
+        default: true
+      run-smoke:
+        type: boolean
+        default: true
+      run-attack:
+        type: boolean
+        default: false
+      run-check-version:
+        type: boolean
+        default: true
+      run-signing-verify:
+        description: Runs `bash tests/test_signing.sh` if true.
+        type: boolean
+        default: false
+
+jobs:
+  shared:
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # First, before anything below can create a build/dist artifact that
+      # would otherwise trip the row-count check for the wrong reason
+      # (REPO-STANDARD.md: order the structure gate before any build step).
+      - name: Repo structure gate (REPO-STANDARD.md)
+        run: make check-repo
+
+      - name: Python (syntax)
+        if: inputs.python-files != ''
+        run: python3 -m py_compile ${{ inputs.python-files }}
+
+      - name: Shell (syntax)
+        if: inputs.shell-files != ''
+        run: bash -n ${{ inputs.shell-files }}
+
+      - name: Sutra vendor drift guard
+        if: inputs.run-check-sutra
+        run: make check-sutra
+
+      - name: GNOME extension (syntax)
+        if: inputs.has-extension
+        run: node --check "${{ inputs.extension-js }}"
+
+      - name: GNOME extension metadata (valid JSON)
+        if: inputs.has-extension && inputs.extension-metadata != ''
+        run: python3 -c "import json; json.load(open('${{ inputs.extension-metadata }}'))"
+
+      - name: man page (syntax)
+        # -t -k, not just -Tutf8 -ww: the bare form exits 0 while silently
+        # skipping the table and UTF-8 preprocessor passes, so a malformed
+        # table would render clean (family hardening, Alfred msg 1628).
+        if: inputs.man-pages != ''
+        run: groff -t -k -man -Tutf8 -ww ${{ inputs.man-pages }} > /dev/null
+
+      - name: Smoke
+        if: inputs.run-smoke
+        run: make smoke
+
+      - name: Attack (adversarial fuzz)
+        if: inputs.run-attack
+        run: make attack
+
+      - name: Check-version
+        if: inputs.run-check-version
+        run: make check-version
+
+      - name: Release-signing verify path
+        if: inputs.run-signing-verify
+        run: bash tests/test_signing.sh

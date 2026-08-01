@@ -24,12 +24,15 @@
 #          <dest>/sutra.commit       the canonical commit this copy came from (the
 #                                    LAG-vs-DRIFT anchor — a separate file, additive,
 #                                    so an unadopted pill's check-sutra is untouched)
-# and the same pair for sutra_update.py and sutra_xen.py (vendored
-# unconditionally beside it — a pill imports only what it needs), and, when
-# an extension dir is given, pill.js + pill.version + pill.commit there the
-# same way (the extension imports it as a sibling: `import * as Pill from
-# './pill.js'` — pill.js is EXEMPT from the collision fix, it already installs
-# per-pill under <prefix>/share/<pill>/extension/<uuid>/ and cannot collide).
+# and the same pair for sutra_update.py, sutra_xen.py, and sutra.mk (the
+# recipe layer -- check-sutra/row-count/checkout-guard, vendored under the
+# same anchor pair so a pill runs the current correct recipe rather than a
+# hand-copied snapshot; see sutra.mk's own header) vendored unconditionally
+# beside sutra.py, and, when an extension dir is given, pill.js +
+# pill.version + pill.commit there the same way (the extension imports it
+# as a sibling: `import * as Pill from './pill.js'` — pill.js is EXEMPT
+# from the collision fix, it already installs per-pill under
+# <prefix>/share/<pill>/extension/<uuid>/ and cannot collide).
 #
 # The pill's CI runs:  sha256sum -c against sutra.version  (integrity, the
 # hard gate — hand-edited or corrupted, always a hard fail); `make
@@ -107,6 +110,19 @@ printf '%s  %s\n' "$ver" "$xsha" > "$DEST/sutra_xen.version"
 [ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra_xen.commit"
 echo "vendored sutra_xen -> $DEST/sutra_xen.py"
 echo "  $xsha"
+# The recipe layer -- vendored under the same integrity chain as code, not
+# copied by hand into a pill's own Makefile. check-sutra itself checks only
+# sutra.py/sutra_update.py/sutra_xen.py above; sutra.mk gets its own
+# integrity+freshness anchor pair here for the same reason they do, but
+# nothing currently re-verifies IT against drift the way it verifies them
+# (a pill runs `include .../sutra.mk` and gets whatever's on disk) --
+# `make vendor` re-running is what keeps it current, same as the others.
+cp "$SRC/sutra.mk" "$DEST/sutra.mk"
+msha="$(sha256sum "$SRC/sutra.mk" | cut -d' ' -f1)"
+printf '%s  %s\n' "$ver" "$msha" > "$DEST/sutra.mk.version"
+[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra.mk.commit"
+echo "vendored sutra.mk -> $DEST/sutra.mk"
+echo "  $msha"
 
 # Extension commons: pill.js lands in the EXTENSION dir (second arg), not
 # bin/ — GJS imports siblings only, and the extension dir is what `make
