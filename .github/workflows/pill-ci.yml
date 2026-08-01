@@ -15,11 +15,28 @@
 #       uses: asuramaya/sutra/.github/workflows/pill-ci.yml@<pinned-sha>
 #       with:
 #         python-files: "src/bin/coldspot src/bin/coldspotd"
+#         shellcheck-files: "install.sh uninstall.sh tests/smoke.sh"
 #         has-extension: true
 #         extension-js: "src/extension/coldspot@asuramaya/extension.js"
 #         extension-metadata: "src/extension/coldspot@asuramaya/metadata.json"
 #         man-pages: "src/data/man/man1/coldspot.1 src/data/man/man8/coldspotd.8"
 #
+# PILOT CORRECTIONS (Till, RAMstein, msg 2739 via Alfred): two gaps found by
+# RAMstein's real pilot adoption, not by sutra validating this against
+# itself or a fake pill built from the same head that authored it --
+#
+#   3. No shellcheck step existed at all, only `bash -n`. Any pill running
+#      shellcheck today (most of them) would silently lose it on adoption
+#      and have to keep a whole separate sibling job just for that one
+#      check. Added below as a real, parameterized step.
+#   4. run-check-version defaulted to true and called `make check-version`
+#      -- a target NO PILL HAS. Checked all five: none define it. Worse,
+#      it is not merely absent but actively wrong for a pill like RAMstein,
+#      whose own check-repo enforces the OPPOSITE convention (a single
+#      packaging/VERSION source of truth, no per-file literal at all) --
+#      the exact thing check-version tests for. Adopting with defaults
+#      would have hard-failed every pill's first CI run. Defaulted to
+#      false; sutra itself is still the only real consumer.
 # Pin question, decided and documented per the ask rather than left
 # implicit: PIN TO A COMMIT SHA, not @main and not a tag. Not @main --
 # every adopting pill's CI would move the instant this file changes, with
@@ -44,6 +61,17 @@ on:
         default: ""
       shell-files:
         description: Space-separated files for `bash -n`. Empty skips the step.
+        type: string
+        default: ""
+      shellcheck-files:
+        description: Space-separated files for shellcheck. Empty skips the step.
+        type: string
+        default: ""
+      shellcheck-exclude:
+        description: >-
+          Comma-separated SC codes passed as `-e`, e.g. "SC2155,SC1090" --
+          not `--rcfile`, which only exists from shellcheck 0.11.0 and
+          ubuntu-latest ships older. Empty passes no exclusions.
         type: string
         default: ""
       has-extension:
@@ -72,8 +100,12 @@ on:
         type: boolean
         default: false
       run-check-version:
+        description: >-
+          Runs `make check-version` if true. Defaults to false: no pill
+          defines that target today, and some (RAMstein) enforce the
+          opposite convention on purpose. See PILOT CORRECTIONS above.
         type: boolean
-        default: true
+        default: false
       run-signing-verify:
         description: Runs `bash tests/test_signing.sh` if true.
         type: boolean
@@ -100,6 +132,10 @@ jobs:
       - name: Shell (syntax)
         if: inputs.shell-files != ''
         run: bash -n ${{ inputs.shell-files }}
+
+      - name: Shellcheck
+        if: inputs.shellcheck-files != ''
+        run: shellcheck ${{ inputs.shellcheck-exclude != '' && format('-e {0}', inputs.shellcheck-exclude) || '' }} ${{ inputs.shellcheck-files }}
 
       - name: Sutra vendor drift guard
         if: inputs.run-check-sutra

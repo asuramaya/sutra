@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.11.0 — four defects from RAMstein's real pilot adoption, plus a safety fix escalated family-wide (2026-08-01)
+
+Till's RAMstein pilot (msg 2739 via Alfred) is the first REAL, independently-
+built consumer of sutra.mk/pill-ci.yml — sutra validating the artifacts
+against itself, and against a fake pill built from the same head that
+authored them, could not surface any of these; both share the author's own
+assumptions by construction.
+
+- **check-sutra dropped pill.js.** The vendored-.py loop covered only
+  sutra/sutra_update/sutra_xen; three of four pills with a hand-written
+  check-sutra today (ByeByte, phanspeed, RAMstein) also check pill.js, per
+  BOOTSTRAP.md's own escape hatch that never made it into the generalized
+  form. Verbatim adoption would have silently deleted an existing guard.
+  Fixed: `SUTRA_EXT_DIR` opts a pill in; pill.js gets the same
+  integrity+freshness shape via a shared shell function, not a duplicate
+  loop body. Empty (the default) skips it exactly like a pill with no
+  extension should.
+- **check-vendored-path validated only one binary per call.** Any pill
+  with more than one sutra-importing binary (RAMstein has four) needed a
+  hand-written loop — precisely the duplication this file exists to
+  prevent. Fixed: new `check-vendored-path-all` target takes
+  `SUTRA_CHECK_BINS`, a space-separated list of `bin` or `bin:module`
+  entries (ramstein-update binds `sutra_update`, not `sutra`).
+- **pill-ci.yml had no shellcheck step**, only `bash -n`. Any pill running
+  shellcheck today would have silently lost it on adoption. Added
+  `shellcheck-files`/`shellcheck-exclude` inputs and a real step.
+- **run-check-version defaulted to true and called a target no pill has.**
+  Checked all five: none define `check-version`. Worse than merely
+  absent — RAMstein's own check-repo enforces the *opposite* convention on
+  purpose (a single `packaging/VERSION`, no per-file literal at all).
+  Adopting with defaults would have hard-failed every pill's first CI run.
+  Defaulted to false; sutra remains the only real consumer.
+- **Safety fix, escalated by Alfred as family-wide rather than
+  RAMstein-specific.** `SUTRA_CHECK_ARGS` defaulted to `--help`, assumed
+  universally safe. It isn't: three of RAMstein's four binaries hand-roll
+  argument parsing rather than using argparse, so an unrecognized
+  `--help` falls through to their default verb — for ramstein/
+  ramstein-healthcheck that meant `make check` making a real socket call
+  to the live daemon on every run. Harmless there by RAMstein's own
+  security model, but a pill whose default verb has a non-idempotent
+  side effect would have this guard silently perform it forever,
+  unnoticed. tjmax's actual pattern (phanspeed `Makefile:38-42`) never
+  assumed a generic flag — `--selftest`/`--check`, pill-specific flags the
+  binary's own author verified safe. `SUTRA_CHECK_ARGS` now has no
+  default at all: empty, the real-subprocess sanity call is skipped
+  entirely and the guard relies solely on the resolution check, which
+  never calls `main()` and is safe against any binary regardless of how
+  it parses arguments.
+- All four fixes verified against an extended scratch fake-pill (a real
+  vendored extension dir with real pill.js anchors, a second binary
+  binding `sutra_update`) plus a second live GitHub Actions run
+  exercising the new shellcheck step and the flipped check-version
+  default — not reasoned through in isolation.
+
 ## 0.10.1 — check-vendored-path: a layout check was standing in for a resolution check (2026-08-01)
 
 - 0.10.0's `check-vendored-path` computed the EXPECTED path in shell (from
