@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.12.2 — the "which prints" transcript was itself stale (2026-08-01)
+
+Doc-only, found by Alfred verifying 0.12.1 independently rather than
+taking it on report (msg 2834). BOOTSTRAP.md's "canonical preamble"
+section showed a hand-copied transcript of `vendor.sh --bootstrap`'s
+output — `sutra 0.7.5`, `see BOOTSTRAP.md` — against what the script
+actually emits today: `$ver` interpolates the live `packaging/VERSION`
+(`sutra 0.12.1` as of the prior pass), and the citation reads
+`see docs/BOOTSTRAP.md`. Same class this whole pass was sent to kill:
+a doc asserting what a command outputs, verified once, never re-run.
+
+Fix is the class, not the number — hand-correcting the transcript to
+0.12.2 would go stale again at 0.12.3 and every bump after. The example
+block now shows the preamble's *shape* with `<ver>`/`<pill-name>`
+placeholders and says outright that the real stamp comes from
+`packaging/VERSION` at generation time and is not reproduced as a fixed
+transcript; the reader is told to run the command in the three lines
+above it and paste what it actually prints. Noted why `<ver>` legitimately
+differs per pill (0.11.1 / 0.10.1 / 0.8.0, ...): it records each pill's
+own vendor moment, not lag.
+
+No vendored module touched. Not sealed — release block still holds.
+
 ## 0.12.1 — BOOTSTRAP.md catches up to sutra.mk (2026-08-01)
 
 Doc-only pass, no behavior change to sutra.py/sutra_update.py/sutra_xen.py/

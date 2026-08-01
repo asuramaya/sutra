@@ -43,13 +43,18 @@ Generate it (the pill name is the only thing that varies):
 bash vendor.sh <dest-lib-dir> --bootstrap=<pill-name>
 ```
 
-which prints:
+which prints a preamble of this shape (not reproduced here as a fixed
+transcript — `<ver>` is filled in from `packaging/VERSION` at generation
+time, so it moves on every release; a hand-copied number in this doc
+would go stale at the very next bump and stay stale forever after, the
+same class of defect this document exists to stop recreating. Run the
+command above and paste what it actually prints):
 
 ```python
-# --- sutra bootstrap (sutra 0.7.5; see BOOTSTRAP.md -- do not hand-edit) ---
+# --- sutra bootstrap (sutra <ver>; see docs/BOOTSTRAP.md -- do not hand-edit) ---
 import os as _os
 import sys as _sys
-_PILL = "byebyte"
+_PILL = "<pill-name>"
 _libdir = _os.path.join(
     _os.path.dirname(_os.path.dirname(_os.path.realpath(__file__))),
     "share", _PILL, "lib")
@@ -58,6 +63,11 @@ if _libdir not in _sys.path:
 del _os, _sys, _libdir, _PILL
 # --- end sutra bootstrap ----------------------------------------------------
 ```
+
+`<ver>` is not a drift signal — it records which sutra a binary's
+preamble came FROM. Pills legitimately show different, older numbers
+(0.11.1, 0.10.1, 0.8.0, ...) here forever; that's each pill's own vendor
+moment, not lag.
 
 Paste it at the top of **every** binary in the pill that does `import
 sutra` (the main daemon, `<pill>-update`, `<pill>-healthcheck`, ...),
