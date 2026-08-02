@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.12.5 — byebyte spelled consistently, family-wide (2026-08-02)
+
+Operator order, via Alfred (msg 3319): `byebyte` must be spelled
+consistently across all files, matching the operator's 2026-07-31 ratified
+name (lowercase; `RAMstein` stays mixed-case — that's its real name).
+sutra carried mixed-case `ByeByte` in 8 files.
+
+- **`sutra_update.py:9`** — `slug="asuramaya/ByeByte"` in the usage-example
+  comment, corrected to `slug="asuramaya/byebyte"`. This one blocks every
+  consuming repo from fixing it locally: the file is byte-identical
+  (sha256 `fbcd892e...`) in sutra, byebyte, RAMstein, phanspeed and
+  coldspot, and `check-sutra` verifies that hash — a pill hand-editing its
+  own copy would fail its own integrity check. Has to change canonically
+  and re-vendor. `SUTRA_UPDATE_VERSION` moved 0.1.0 -> 0.1.1 per the
+  per-file-version-tracks-bytes rule (`.github/CONTRIBUTING.md`,
+  mechanically enforced by `tests/check_version.sh` — no carve-out for
+  "just a comment"). New sha256: `10d6854a...`.
+- **`pill.js:16`** — `(ByeByte thinks in weeks, RAMstein in seconds)`,
+  corrected to lowercase. Found in the same sweep, same shape Alfred
+  named for `sutra_update.py` but didn't catch here: byte-identical
+  (sha256 `c22472ed...`) in sutra, byebyte, RAMstein, phanspeed and
+  coldspot (kast has no `pill.js`), verified by `check-sutra` via
+  `SUTRA_EXT_DIR`. Same blocking shape, same fix, same four consuming
+  repos. `PILL_JS_VERSION` moved 0.1.0 -> 0.1.1. New sha256:
+  `cd726e2b...`.
+- **`sutra.py:3,166,298,335`** — four prose mentions, lowercased. Also
+  byte-identical across all six pills (byebyte, RAMstein, coldspot,
+  phanspeed, kast, gestalt), same shape as the two above, wider blast
+  radius. `SUTRA_VERSION` moved 0.3.0 -> 0.3.1. New sha256:
+  `8c5b0095...`.
+- **`sutra.mk:55`** — one prose mention, lowercased. Vendored under its
+  own integrity+freshness anchor pair (like the four `.py`/`.js` files)
+  but has no embedded per-file version constant of its own — its
+  `.version` anchor is written by `vendor.sh` directly from
+  `packaging/VERSION`, so the repo-level bump below covers it; nothing
+  else to move here.
+- **`docs/USAGE.md:11-12` and `vendor.sh:6-7`** — the vendor-command usage
+  example was wrong twice over, not just stale case: `ByeByte/share/...`
+  should have been `byebyte/src/share/...` — missing both the rename and
+  the REPO-STANDARD `src/` fold. Verified against the real path on disk
+  before fixing. **`README.md:134-135`** carried the identical wrong
+  example — same two bugs, same fix, found in the audit pass rather than
+  named by the dispatch.
+- **`README.md:4,52`** — the family-repo link and the `ControlServer` prose
+  mention, lowercased to match.
+- **`docs/CHANGELOG.md`'s own historical entries left untouched**,
+  deliberately: they're a record of what was written and believed true at
+  the time, the same reason git commit subjects don't get rewritten.
+
+No vendored-file drift for anyone *today* — every consuming pill's
+integrity check compares its own copy against its own recorded anchor,
+not this repo's HEAD, so nothing goes red until a pill actually
+re-vendors. But `sutra.py`, `sutra_update.py` and `pill.js` all moved
+(three files, not the two originally scoped — `sutra.py`'s four prose
+mentions were named as "just prose" but are byte-identical across all
+six pills same as the other two), so the parked re-vendor wave (thread
+`a8de30f9`, previously measured metadata-only) now carries a real
+three-file change: byebyte/RAMstein/phanspeed/coldspot for all three
+files, plus kast and gestalt for `sutra.py` alone. Pairing the two waves
+rather than running separate ones, per Alfred's instruction.
+
+`make check` green (15 rows), including `check-version` — the three
+per-file version constants that actually moved bytes are the three that
+got bumped, verified against `git diff HEAD~1 HEAD` after committing,
+not just `make check` run early against an uncommitted tree. Graph
+project-name confusion for this pill (`bytebye` / `ByeByte` / `byebyte`
+as three live project objects) is explicitly out of scope here — Thoth's,
+not the file layer's.
+
 ## 0.12.4 — sutra doesn't release: a structural ruling documented as a timing gate (2026-08-01)
 
 Doc-only. The operator ordered "get everyone to tag so I can seal";

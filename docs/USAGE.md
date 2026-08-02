@@ -8,8 +8,8 @@ the README for what each product file (`sutra.py`, `sutra_update.py`,
 ## Vendoring into a pill
 
 ```sh
-make vendor DEST=/home/asuramaya/code/REPOS/ByeByte/share/byebyte/lib \
-            EXT=/home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya \
+make vendor DEST=/home/asuramaya/code/REPOS/byebyte/src/share/byebyte/lib \
+            EXT=/home/asuramaya/code/REPOS/byebyte/src/extension/byebyte@asuramaya \
             BOOTSTRAP=byebyte
 ```
 

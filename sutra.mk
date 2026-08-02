@@ -52,7 +52,7 @@ _SUTRA_CANON := $(HOME)/code/REPOS/sutra
 #
 # PILOT FIX 1 (Till/RAMstein): the first cut looped only sutra/sutra_update/
 # sutra_xen -- the three .py modules living beside sutra.mk itself. But
-# ByeByte, phanspeed AND RAMstein (three of four pills with a hand-written
+# byebyte, phanspeed AND RAMstein (three of four pills with a hand-written
 # check-sutra today) also check pill.js, per BOOTSTRAP.md's own escape
 # hatch ("extend the for mod in... line with pill.js") -- a hatch that
 # never made it into this generalized form. Verbatim adoption would have

@@ -1,7 +1,7 @@
 # sutra
 
 The shared runtime backbone of the pill family —
-[ByeByte](https://github.com/asuramaya/ByeByte),
+[byebyte](https://github.com/asuramaya/byebyte),
 [RAMstein](https://github.com/asuramaya/RAMstein),
 [coldspot](https://github.com/asuramaya/coldspot),
 [phanspeed](https://github.com/asuramaya/phanspeed),
@@ -49,7 +49,7 @@ coordination.)
 
 | API | what it is |
 |---|---|
-| `ControlServer` | the SO_PEERCRED-gated newline-JSON control socket — peer check, bounded reads, hostile-input framing. `ping`/`status` answered here; every other command is handed to the pill's `dispatch(cmd, req)`. Authorization is pluggable: `allow_uids({...})` for the uid model (ByeByte/RAMstein/phanspeed) or `allow_group("coldspot")` for the group model. |
+| `ControlServer` | the SO_PEERCRED-gated newline-JSON control socket — peer check, bounded reads, hostile-input framing. `ping`/`status` answered here; every other command is handed to the pill's `dispatch(cmd, req)`. Authorization is pluggable: `allow_uids({...})` for the uid model (byebyte/RAMstein/phanspeed) or `allow_group("coldspot")` for the group model. |
 | `load_config` | the seed-never-master loader: typed, clamped, unknown keys ignored, a tampered config can't push a value past its clamp. |
 | `write_status` | atomic (tmp + rename) status.json write, mode 0640, chowned to the owner only as root. |
 | `ewma_rate` | one EWMA step over a value whose growth is the burn — smoothed bytes/sec for the ETA. |
@@ -131,8 +131,8 @@ sutra: `import sutra`, a `DEFAULTS`/`CLAMPS` pair, a `dispatch` callable, the
 loop. Copy that shape. To vendor into a pill:
 
 ```sh
-make vendor DEST=/home/asuramaya/code/REPOS/ByeByte/share/byebyte/lib \
-            EXT=/home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya \
+make vendor DEST=/home/asuramaya/code/REPOS/byebyte/src/share/byebyte/lib \
+            EXT=/home/asuramaya/code/REPOS/byebyte/src/extension/byebyte@asuramaya \
             BOOTSTRAP=byebyte
 ```
 

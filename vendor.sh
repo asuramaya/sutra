@@ -3,8 +3,8 @@
 # record the version+hash it came from so a CI drift-check can prove the copy
 # was never hand-edited.
 #
-#   ./vendor.sh /home/asuramaya/code/REPOS/ByeByte/share/byebyte/lib \
-#               /home/asuramaya/code/REPOS/ByeByte/extension/byebyte@asuramaya \
+#   ./vendor.sh /home/asuramaya/code/REPOS/byebyte/src/share/byebyte/lib \
+#               /home/asuramaya/code/REPOS/byebyte/src/extension/byebyte@asuramaya \
 #               --bootstrap=byebyte
 #
 # DEST is each pill's own PRIVATE lib dir, never a shared bin/ — six pills
