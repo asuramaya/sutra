@@ -352,6 +352,23 @@ check-vendored-path-all:
 # heredoc for others (byebyte, RAMstein, kast); no single guess is right
 # for both shapes, and a wrong guess that's sometimes right is worse than
 # refusing to guess.
+#
+# CONSTRAINT ON ADOPTING INLINE COMMENTS (found by Maat/kast, verified by
+# Alfred, msg 3399): this format assumes packages.txt is read only by a
+# human and by this parser. That is false for kast -- install.sh:245 feeds
+# packages.txt's surviving lines straight to `apt-get install`, filtered
+# only by `grep -Ev '^\s*(#|$)'` (drops whole-comment and blank lines, but
+# does NOT strip a trailing inline `# comment` off an otherwise-real line).
+# A bare-name-only file like kast's works today; a pill CANNOT SAFELY
+# ADOPT this file's inline-comment style if anything else machine-parses
+# the same file without first stripping trailing comments. Checked family-
+# wide: byebyte/RAMstein/coldspot/phanspeed/gestalt have no second
+# consumer; kast alone does. RULE: before a pill's packages.txt gains
+# inline comments, confirm nothing besides this parser reads the file
+# directly, or fix that consumer to strip trailing `#...` first (one
+# `sed 's/#.*//'` ahead of its own filter costs nothing). Same shape as
+# the echo/printf bug above: a convention that is safe only because nobody
+# has exercised the unsafe case yet, and says nothing about it on its own.
 SUTRA_PACKAGES_TXT ?= packaging/packages.txt
 SUTRA_PACKAGES_VERIFY_AGAINST ?=
 

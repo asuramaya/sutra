@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.12.7 — the format has a second machine consumer, and only one pill knows it (2026-08-03)
+
+Doc-only, no parser change. Maat found, Alfred verified: `kast/install.sh:245`
+feeds `packages.txt`'s surviving lines straight to `apt-get install`, filtered
+only by `grep -Ev '^\s*(#|$)'` — drops whole-comment and blank lines, but does
+NOT strip a trailing inline `# comment` off an otherwise-real line. kast's
+file has always been bare-name-only; that isn't a missing convention, it's a
+constraint its own installer imposes. checked family-wide (Alfred): byebyte,
+RAMstein, coldspot, phanspeed and gestalt have no second consumer of the
+file — kast alone does.
+
+The 0.12.6 parser is unaffected — split-on-first-`#` yields the bare token
+whether or not a comment follows, so kast's comment-free lines already parse
+correctly, no code change needed. The risk runs the other way: if kast
+later adopts the family's inline-comment style to look consistent, its own
+installer would silently start trying to install comment text as package
+names. Documented the rule directly in `sutra.mk`'s `check-packages` header,
+next to `SUTRA_PACKAGES_VERIFY_AGAINST`: a pill may add inline comments to
+its `packages.txt` only if nothing besides this parser reads the file
+directly, or after fixing that consumer to strip trailing comments first —
+a single `sed 's/#.*//'` ahead of kast's own grep costs nothing. Same shape
+as 0.12.6's echo/printf bug: a convention that's safe only because nobody
+has exercised the unsafe case yet, and says nothing about it on its own.
+
+Five seats already have the 0.12.6 spec by mail; four of them have no
+reason to suspect their own file is anything but documentation, and this
+is the fact that would have caught them out first. `make check` green
+(15 rows).
+
 ## 0.12.6 — check-packages: Depends/Suggests generated from packages.txt (2026-08-03)
 
 Operator ruling 2cd900ce, dispatched via Alfred (msg 3356): nothing
