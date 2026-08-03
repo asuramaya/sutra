@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.12.8 — the GNOME extension syntax gate has never checked anything (2026-08-03)
+
+Till found, Alfred verified (msg 3410): `node --check <path>` on a plain
+`.js` file silently validates nothing when the file is an ES module —
+which every pill's `extension.js`/`pill.js` is, by construction.
+Reproduced against a deliberately broken fixture: `node --check
+broken.js` exits 0 on garbage a human rejects on sight; `node --check
+broken.mjs` and `node --input-type=module --check < broken.js` both
+correctly exit 1. `pill-ci.yml`'s "GNOME extension (syntax)" step —
+the shared job every pill inherits via `uses:` — has used the bare form
+since it existed. It has never caught a single GJS syntax error, in any
+pill, in any repo, ever; every green checkmark on that step came from a
+command that exits 0 on `function f( {`.
+
+The loop fix documented right above this line in the same file (`node
+--check a.js b.js` only validates the first file) was real, correctly
+diagnosed, and carefully explained — and stopped one question short: the
+command inside the loop was never checking anything to begin with.
+
+- **Fixed**: `node --check "$f"` → `node --input-type=module --check <
+  "$f"`, the stdin form, chosen over the temp-file/`.mjs`-copy form
+  already used ad hoc in byebyte's Makefile and hector-vector's ci.yml
+  — no cleanup path to get wrong. An `echo "checking $f"` precedes each
+  check: node's stdin-mode error names the file `[stdin]`, not the real
+  path, and this step's shell runs with `-e`, so the log line above the
+  failure is the only place the real filename survives.
+- **Re-verified against real files before landing**, not just the
+  synthetic fixture: byebyte's `extension.js`/`pill.js`, kast's
+  `extension.js`/`prefs.js`, and coldspot's `extension.js` all pass
+  clean under the stricter parse — no false-positive risk.
+- **Sutra's own `tests/smoke.sh` already used the correct
+  `--input-type=module` form for its own `pill.js` gate** — the fix
+  existed in this exact repo the whole time, it just never propagated
+  from the local test into the shared CI step this repo also publishes.
+  No other `node --check` site found in sutra (grepped the repo).
+
+Consequence worth recording, not sutra's to fix: this is the least-
+verified code in the family right now — a pill's GNOME extension syntax
+has been "checked" by a command that checks nothing, in CI, since the
+step existed. Till swept every pill with the reliable form before
+reporting; nothing is currently broken anywhere, this closes a silent
+gap, not an active fire.
+
+No vendored `.py`/`.js` module touched — `pill-ci.yml` only. `make
+check` green (15 rows).
+
 ## 0.12.7 — the format has a second machine consumer, and only one pill knows it (2026-08-03)
 
 Doc-only, no parser change. Maat found, Alfred verified: `kast/install.sh:245`

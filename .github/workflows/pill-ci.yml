@@ -235,11 +235,33 @@ jobs:
       # after it becomes that script's own argv and is never parsed at
       # all. Measured: a real syntax error in a second file exits 0.
       # Loop instead, one `node --check` per file.
+      #
+      # PLAIN `node --check <path>` ON A .js FILE VALIDATES NOTHING (Till,
+      # verified by Alfred, msg 3410): every pill's extension.js/pill.js is
+      # an ES module by construction, but a bare `.js` `--check` neither
+      # requires nor reliably parses module syntax -- measured against a
+      # deliberately broken fixture, `node --check broken.js` exits 0 on
+      # garbage a human would reject on sight. `node --check broken.mjs`
+      # and `node --input-type=module --check < broken.js` both correctly
+      # exit 1. This step has never validated a single character of GJS in
+      # any pill, in any repo, ever -- the loop fix above was real and
+      # correctly diagnosed; the command inside the loop was never checking
+      # anything, one question short. Fixed with the stdin form over the
+      # temp-file/.mjs-copy form used ad hoc in byebyte's Makefile and
+      # hector-vector's ci.yml: no cleanup path to get wrong. The `echo`
+      # before each check exists because node's stdin-mode error names the
+      # file "[stdin]", not the real path, and this step's own default
+      # shell runs with -e -- the first failure ends the loop, so the log
+      # line right above it is the only place the real filename survives.
+      # Re-verified against real extension.js/pill.js/prefs.js from
+      # byebyte, kast and coldspot before landing -- all pass clean, no
+      # false-positive risk from the stricter parse.
       - name: GNOME extension (syntax)${{ inputs.has-extension == false && ' -- SKIPPED (has-extension is false)' || '' }}
         run: |
           if [ "${{ inputs.has-extension }}" = "true" ]; then
             for f in ${{ inputs.extension-js }}; do
-              node --check "$f"
+              echo "checking $f"
+              node --input-type=module --check < "$f"
             done
           else
             echo "extension (syntax): SKIPPED (has-extension is false)"
