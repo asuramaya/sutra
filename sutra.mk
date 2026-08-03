@@ -211,7 +211,14 @@ SUTRA_CHECK_MODULE ?= sutra
 # time this was tried). `define` is Make's own mechanism for a multi-line
 # value; `export` turns it into a real environment variable a subshell can
 # read back with `$$VARNAME`, sidestepping Make's own recipe-line rules
-# entirely for the payload.
+# entirely for the payload. Piped to python3 via `printf '%s\n'`, not
+# `echo`: dash's `echo` builtin (the family's `/bin/sh`) interprets `\n`/
+# `\t` as real escapes in its argument, silently corrupting any embedded
+# script that contains one as a Python string literal -- this script has
+# none today so `echo` never broke it, but check-packages below does and
+# hit exactly that corruption the first time it ran. `printf`'s `%s` never
+# interprets its argument's content, only the format string, which is
+# ours and escape-free.
 define _SUTRA_CHECK_VENDORED_PATH_PY
 import importlib.util
 import os
@@ -283,7 +290,7 @@ check-vendored-path:
 	    fi; \
 	fi; \
 	expected="$$(cd "$(_SUTRA_MK_DIR)" && pwd)/$(SUTRA_CHECK_MODULE).py"; \
-	echo "$$_SUTRA_CHECK_VENDORED_PATH_PY" | python3 - "$(SUTRA_CHECK_BIN)" "$(SUTRA_CHECK_MODULE)" "$$expected"
+	printf '%s\n' "$$_SUTRA_CHECK_VENDORED_PATH_PY" | python3 - "$(SUTRA_CHECK_BIN)" "$(SUTRA_CHECK_MODULE)" "$$expected"
 
 # --- check-vendored-path-all: the same guard, across every binary ---------
 # PILOT FIX 2 (Till/RAMstein): check-vendored-path validates exactly one
@@ -315,3 +322,143 @@ check-vendored-path-all:
 	        || fail=1; \
 	done; \
 	exit $$fail
+
+# --- check-packages: Depends/Suggests generated from packages.txt, never
+# hand-maintained -- ruling 2cd900ce (operator, 2026-08-03): the hard
+# Depends floor is a short fixed list (python3/systemd/openssh-client plus
+# documented domain exemptions), EVERYTHING else is Suggests -- never
+# Recommends, because apt installs Recommends by default and a headless
+# `apt install <pill>` must never pull GNOME Shell -- and build-time deps
+# appear in neither tier. packages.txt becomes the generated source of
+# control so the two can never drift again (dispatch msg 3356 via Alfred).
+#
+# Measured before building (msg 3364, confirmed msg 3365): packages.txt
+# across the family already carries a "# --- hard (...) ---" / "# ---
+# optional (...) ---" header-comment convention in three of five pills.
+# Adopted here as the machine marker rather than inventing new syntax, so
+# those three need zero reformatting. A line is read as a real dependency
+# only inside an open hard/optional section, and only the text before its
+# OWN trailing `# comment` -- everything else in the file, including a
+# pill's build-time-only deps, is prose this parser never looks at. That
+# is what keeps build-time deps out of control WITHOUT a special case for
+# them: the thing you must not emit is simply unreachable, not merely
+# forbidden -- same shape as SUTRA_EXT_DIR's opt-in above, a parser that
+# sees nothing until a file is shaped for it.
+#
+# SUTRA_PACKAGES_TXT is the pill's own packages.txt. No default for
+# SUTRA_PACKAGES_VERIFY_AGAINST -- same doctrine as SUTRA_CHECK_BIN above:
+# a pill's real Depends line lives in a static packaging/debian/control
+# for some pills (coldspot, phanspeed) and inside an inline Makefile
+# heredoc for others (byebyte, RAMstein, kast); no single guess is right
+# for both shapes, and a wrong guess that's sometimes right is worse than
+# refusing to guess.
+SUTRA_PACKAGES_TXT ?= packaging/packages.txt
+SUTRA_PACKAGES_VERIFY_AGAINST ?=
+
+# A `define`/`endef` + `export` block, not a heredoc inlined into the
+# recipe -- same reason as _SUTRA_CHECK_VENDORED_PATH_PY above (GNU Make's
+# recipe-line rules do not tolerate a quoted heredoc body).
+define _SUTRA_CHECK_PACKAGES_PY
+import re
+import sys
+
+HEADER_RE = re.compile(r'^#\s*-{2,}\s*(hard|optional|build)\b', re.IGNORECASE)
+
+
+def parse(path):
+    tiers = {"hard": [], "optional": [], "build": []}
+    current = None
+    with open(path) as f:
+        for raw in f:
+            line = raw.rstrip("\n")
+            m = HEADER_RE.match(line)
+            if m:
+                current = m.group(1).lower()
+                continue
+            if current not in ("hard", "optional"):
+                continue
+            entry = line.split("#", 1)[0].strip()
+            if entry:
+                tiers[current].append(entry)
+    return tiers
+
+
+def find_field(name, text):
+    # Not anchored to line-start: a static control file has "Depends:" as
+    # the whole line, but a pill's inline Makefile heredoc has it embedded
+    # mid-line inside a quoted echo, trailing "; \ -- quote, semicolon,
+    # continuation backslash, each possibly separated by whitespace, not
+    # one contiguous run. Strip one artifact char at a time, from the
+    # right, until none remain -- a single regex class-match only eats a
+    # CONTIGUOUS run and stops at the first space, which silently left a
+    # trailing '"; \' on the Makefile shape the first time this was run
+    # (measured, not assumed -- caught before landing, not after).
+    m = re.search(name + r':\s*([^\n]*)', text)
+    if not m:
+        return None
+    val = m.group(1).strip()
+    while val and val[-1] in '\\;"\'':
+        val = val[:-1].rstrip()
+    return val
+
+
+def entry_set(s):
+    # Depends:/Suggests: is an unordered comma list to dpkg (no family
+    # package here uses "|" alternatives, which WOULD be order-sensitive) --
+    # compare as a set, not a string, or a control file that lists the same
+    # packages in a different order than packages.txt reads as drift when
+    # it is not. Measured: phanspeed's real control and packages.txt
+    # disagreed only on order the first time this ran, not content.
+    return {p.strip() for p in s.split(",") if p.strip()}
+
+
+path = sys.argv[1]
+mode = sys.argv[2]
+tiers = parse(path)
+depends = ", ".join(tiers["hard"])
+suggests = ", ".join(tiers["optional"])
+
+if mode == "--depends":
+    print(depends)
+elif mode == "--suggests":
+    print(suggests)
+elif mode == "--verify":
+    target = sys.argv[3]
+    with open(target) as f:
+        text = f.read()
+    fail = False
+    recommends = find_field("Recommends", text)
+    if recommends is not None:
+        print(f"check-packages FAIL: {target} has a Recommends: line "
+              f"({recommends!r}) -- family doctrine is Suggests only "
+              f"(2cd900ce): apt installs Recommends by default")
+        fail = True
+    actual_depends = find_field("Depends", text)
+    if entry_set(actual_depends or "") != entry_set(depends):
+        print("check-packages FAIL: Depends mismatch")
+        print(f"  {target}: {actual_depends!r}")
+        print(f"  {path}:   {depends!r}")
+        fail = True
+    else:
+        print(f"check-packages: Depends ok ({depends or '(empty)'})")
+    actual_suggests = find_field("Suggests", text)
+    if entry_set(actual_suggests or "") != entry_set(suggests):
+        print("check-packages FAIL: Suggests mismatch")
+        print(f"  {target}: {actual_suggests!r}")
+        print(f"  {path}:   {suggests!r}")
+        fail = True
+    else:
+        print(f"check-packages: Suggests ok ({suggests or '(none declared)'})")
+    sys.exit(1 if fail else 0)
+else:
+    print(f"check-packages: unknown mode {mode!r} -- use --depends, "
+          f"--suggests, or --verify <file>", file=sys.stderr)
+    sys.exit(1)
+endef
+export _SUTRA_CHECK_PACKAGES_PY
+
+.PHONY: check-packages
+check-packages:
+	@[ -f "$(SUTRA_PACKAGES_TXT)" ] || { echo "check-packages: no $(SUTRA_PACKAGES_TXT) -- set SUTRA_PACKAGES_TXT=<path>"; exit 1; }
+	@[ -n "$(SUTRA_PACKAGES_VERIFY_AGAINST)" ] || { echo "check-packages: set SUTRA_PACKAGES_VERIFY_AGAINST=<path-to-your-control-file-or-Makefile> -- no default, see sutra.mk's own comment above this target"; exit 1; }
+	@printf '%s\n' "$$_SUTRA_CHECK_PACKAGES_PY" | python3 - "$(SUTRA_PACKAGES_TXT)" --verify "$(SUTRA_PACKAGES_VERIFY_AGAINST)"

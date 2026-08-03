@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.12.6 — check-packages: Depends/Suggests generated from packages.txt (2026-08-03)
+
+Operator ruling 2cd900ce, dispatched via Alfred (msg 3356): nothing
+auto-pulls — hard `Depends` is a short fixed floor (python3/systemd/
+openssh-client plus documented domain exemptions), everything else is
+`Suggests` (never `Recommends` — apt installs Recommends by default, and
+a headless `apt install <pill>` must never pull GNOME Shell), build-time
+deps appear in neither tier. `packages.txt` becomes the generated source
+of `control` so the two can't drift again — measured cause: two of five
+pills (byebyte, RAMstein) documented an optional tier their shipped
+artifact never emitted, and the audit that found it independently missed
+`Recommends:` on a third (coldspot) by grepping only `Depends:`.
+
+Measured before building (msg 3364, shape confirmed msg 3365):
+`packages.txt` is less uniform than the dispatch assumed — only three of
+five pills (byebyte, RAMstein, phanspeed) already share a `# --- hard
+(...) ---` / `# --- optional (...) ---` header-comment convention;
+coldspot's optional tier was package names written *inside* a comment
+body (unparseable), kast had no hard/optional split in the file at all.
+Control generation also splits two ways: byebyte/RAMstein/kast build
+`control` from an inline Makefile heredoc with a hardcoded string
+(`packages.txt` not consulted at all); coldspot/phanspeed ship a static
+`packaging/debian/control`.
+
+- **New `check-packages` target in `sutra.mk`**, same shape as
+  `check-vendored-path`: an inline Python script via `define`/`export`.
+  Adopts the existing three-pill header convention as the machine
+  marker rather than inventing new syntax — zero reformatting needed for
+  those three. Added `# --- build (...) ---` as an optional fourth
+  header, additive, for symmetry.
+- **Parse rule**: a section stays open from its header to the next
+  header or EOF; nothing outside an open hard/optional section is ever
+  read. That's what keeps build-time deps out of `control` *without* a
+  special case — the thing you must not emit is structurally unreachable,
+  not merely forbidden, same shape as `SUTRA_EXT_DIR`'s opt-in above it.
+  Inside a section, everything before a line's own trailing `# comment`
+  is the entry, passed through verbatim (a Debian version constraint
+  like `python3 (>= 3.8)` just works, no separate syntax).
+- **Two modes**: bare `--depends`/`--suggests` print the computed value
+  for a heredoc-style Makefile to interpolate directly; `--verify <file>`
+  reads an existing `control` or `Makefile` and fails loudly on any
+  mismatch, for the static-file pills. Comparison is by set, not string —
+  measured live against phanspeed's real files: same packages, different
+  order, which a naive string compare would have flagged as false drift.
+  A bare `Recommends:` line in the target is its own hard failure
+  regardless of content, per the ruling.
+- **The format was published to all five seats before the parser was
+  finished** (Alfred's explicit sequencing call, inverted from the usual
+  pilot-then-extract order): all five were reformatting `packages.txt`
+  simultaneously when this landed, so publishing the spec first meant
+  one target shape instead of five independent guesses to reconcile
+  after. coldspot and kast got the reformat flagged as their own
+  required work (no split existed yet in either); the other three were
+  already close.
+- **A real portability bug, caught building this, fixed at both call
+  sites**: `echo "$$VAR" | python3 -` corrupts any embedded script
+  containing `\n`/`\t` — dash's `echo` (the family's `/bin/sh`)
+  interprets those as real escapes in its argument, silently splitting a
+  Python string literal across lines. `check-vendored-path`'s existing
+  invocation never hit this only because its script happens to contain
+  no such sequence; switched to `printf '%s\n'` there too, no behavior
+  change, just no longer accidentally correct.
+- **Tested end-to-end through real `make`**, not just the raw parser:
+  matching fixture (pass), content mismatch (fail, both values shown),
+  missing `SUTRA_PACKAGES_VERIFY_AGAINST` (fail loudly, no guess),
+  `Recommends:` present (fail on doctrine), hard-deps-only pill with no
+  optional tier (pass, `(none declared)`) — plus live-verified against
+  all five real family repos' actual `packages.txt`/`control`/`Makefile`
+  as each landed its own reformat during the same window.
+
+No vendored `.py`/`.js` module touched — this is `sutra.mk` only, the
+recipe layer, no re-vendor obligation of its own. Paired with the
+existing re-vendor wave (`a8de30f9`) rather than opening a second one, as
+instructed. `make check` green (15 rows).
+
 ## 0.12.5 — byebyte spelled consistently, family-wide (2026-08-02)
 
 Operator order, via Alfred (msg 3319): `byebyte` must be spelled
