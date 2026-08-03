@@ -1,7 +1,7 @@
 """sutra — the shared runtime backbone of the pill family.
 
 One canonical source, vendored byte-identical into each pill (byebyte,
-RAMstein, coldspot, phanspeed, kast, gestalt) so every .deb stays
+ramstein, coldspot, phanspeed, kast, gestalt) so every .deb stays
 self-contained with zero external dependency. `make vendor` in a pill copies
 this file in; a CI hash check keeps the copies from drifting. When all pills
 sit at the same sutra version they share ONE hash — that shared hash is the
@@ -44,7 +44,7 @@ import subprocess
 import threading
 import time
 
-SUTRA_VERSION = "0.3.1"
+SUTRA_VERSION = "0.3.2"
 
 
 # --- config: the seed, never the master -------------------------------------
@@ -163,7 +163,7 @@ def ewma_rate(prev, value, now, tau):
 
 def allow_uids(uids):
     """authz: a peer is allowed iff its uid is in `uids` (include 0 for root).
-    The model for byebyte / RAMstein / phanspeed — pair with socket_owner
+    The model for byebyte / ramstein / phanspeed — pair with socket_owner
     (owner_uid, -1)."""
     allowed = set(uids)
     return lambda uid, _gid: uid in allowed
@@ -295,7 +295,7 @@ def read_status(status_path):
 # --- health: the vitals verdict every healthcheck bin repeats ---------------
 # Freshness judged against the daemon's OWN declared poll_interval, never a
 # magic number — a config that slows polling to 10min must not fake an
-# outage (byebyte/RAMstein's originals agreed on this, independently). Same
+# outage (byebyte/ramstein's originals agreed on this, independently). Same
 # 3x+5s slack as pill.js's isStale, so a stale status reads identically from
 # a CLI healthcheck and a GNOME pill. Passive: it renders a verdict, it never
 # restarts anything — that stays each pill's call (systemd's Restart=, or

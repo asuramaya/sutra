@@ -23,8 +23,8 @@
 #         extension-metadata: "src/extension/coldspot@asuramaya/metadata.json"
 #         man-pages: "src/data/man/man1/coldspot.1 src/data/man/man8/coldspotd.8"
 #
-# PILOT CORRECTIONS (Till, RAMstein, msg 2739 via Alfred): two gaps found by
-# RAMstein's real pilot adoption, not by sutra validating this against
+# PILOT CORRECTIONS (Till, ramstein, msg 2739 via Alfred): two gaps found by
+# ramstein's real pilot adoption, not by sutra validating this against
 # itself or a fake pill built from the same head that authored it --
 #
 #   3. No shellcheck step existed at all, only `bash -n`. Any pill running
@@ -33,7 +33,7 @@
 #      check. Added below as a real, parameterized step.
 #   4. run-check-version defaulted to true and called `make check-version`
 #      -- a target NO PILL HAS. Checked all five: none define it. Worse,
-#      it is not merely absent but actively wrong for a pill like RAMstein,
+#      it is not merely absent but actively wrong for a pill like ramstein,
 #      whose own check-repo enforces the OPPOSITE convention (a single
 #      packaging/VERSION source of truth, no per-file literal at all) --
 #      the exact thing check-version tests for. Adopting with defaults
@@ -123,7 +123,7 @@ on:
       run-check-version:
         description: >-
           Runs `make check-version` if true. Defaults to false: no pill
-          defines that target today, and some (RAMstein) enforce the
+          defines that target today, and some (ramstein) enforce the
           opposite convention on purpose. See PILOT CORRECTIONS above.
         type: boolean
         default: false
@@ -170,7 +170,7 @@ jobs:
       - name: Repo structure gate (REPO-STANDARD.md)
         run: make check-repo
 
-      # DEFECT 7 (Till, RAMstein, and independently tjmax, msg 2791 via
+      # DEFECT 7 (Till, ramstein, and independently tjmax, msg 2791 via
       # Alfred): every step below used to gate with a step-level `if:`.
       # GitHub Actions marks a gated-off step `conclusion: skipped` --
       # accurate, but INVISIBLE in `gh run view`'s default summary, which

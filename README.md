@@ -2,7 +2,7 @@
 
 The shared runtime backbone of the pill family —
 [byebyte](https://github.com/asuramaya/byebyte),
-[RAMstein](https://github.com/asuramaya/RAMstein),
+[ramstein](https://github.com/asuramaya/ramstein),
 [coldspot](https://github.com/asuramaya/coldspot),
 [phanspeed](https://github.com/asuramaya/phanspeed),
 [kast](https://github.com/asuramaya/kast),
@@ -49,7 +49,7 @@ coordination.)
 
 | API | what it is |
 |---|---|
-| `ControlServer` | the SO_PEERCRED-gated newline-JSON control socket — peer check, bounded reads, hostile-input framing. `ping`/`status` answered here; every other command is handed to the pill's `dispatch(cmd, req)`. Authorization is pluggable: `allow_uids({...})` for the uid model (byebyte/RAMstein/phanspeed) or `allow_group("coldspot")` for the group model. |
+| `ControlServer` | the SO_PEERCRED-gated newline-JSON control socket — peer check, bounded reads, hostile-input framing. `ping`/`status` answered here; every other command is handed to the pill's `dispatch(cmd, req)`. Authorization is pluggable: `allow_uids({...})` for the uid model (byebyte/ramstein/phanspeed) or `allow_group("coldspot")` for the group model. |
 | `load_config` | the seed-never-master loader: typed, clamped, unknown keys ignored, a tampered config can't push a value past its clamp. |
 | `write_status` | atomic (tmp + rename) status.json write, mode 0640, chowned to the owner only as root. |
 | `ewma_rate` | one EWMA step over a value whose growth is the burn — smoothed bytes/sec for the ETA. |

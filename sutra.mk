@@ -21,11 +21,11 @@
 # current correct thing by construction instead of a snapshot someone
 # copied by hand and never revisited.
 #
-# PILOT CORRECTIONS (Till, RAMstein, msg 2739 via Alfred): the first
+# PILOT CORRECTIONS (Till, ramstein, msg 2739 via Alfred): the first
 # published form was validated against sutra itself and a fake pill built
 # from the same head that authored it -- both share the author's own
 # assumptions and neither could surface a gap only a REAL, independently-
-# built consumer would hit. Four gaps found by RAMstein's real pilot
+# built consumer would hit. Four gaps found by ramstein's real pilot
 # adoption are fixed below; each is called out at its own site rather than
 # only here, since "what changed" matters less than "why the first cut
 # missed it."
@@ -50,9 +50,9 @@ _SUTRA_CANON := $(HOME)/code/REPOS/sutra
 # LAG, the copy has genuinely fallen behind, warn only. Not in canonical's
 # history at all -> DRIFT, hard fail.
 #
-# PILOT FIX 1 (Till/RAMstein): the first cut looped only sutra/sutra_update/
+# PILOT FIX 1 (Till/ramstein): the first cut looped only sutra/sutra_update/
 # sutra_xen -- the three .py modules living beside sutra.mk itself. But
-# byebyte, phanspeed AND RAMstein (three of four pills with a hand-written
+# byebyte, phanspeed AND ramstein (three of four pills with a hand-written
 # check-sutra today) also check pill.js, per BOOTSTRAP.md's own escape
 # hatch ("extend the for mod in... line with pill.js") -- a hatch that
 # never made it into this generalized form. Verbatim adoption would have
@@ -142,7 +142,7 @@ check-sutra-rows:
 	@echo "root row count: $(SUTRA_ROOT_ROWS)"
 
 # --- the checkout-run guard ------------------------------------------------
-# Till's form (RAMstein tests/smoke.sh:296; maat, kast tests/smoke.sh:168):
+# Till's form (ramstein tests/smoke.sh:296; maat, kast tests/smoke.sh:168):
 # a binary that silently imported a DIFFERENT sutra.py off sys.path would
 # still exit 0 -- rc=0 alone proves nothing about WHICH copy got imported.
 # Prove the path Python actually bound, not a prediction of what it should be.
@@ -180,14 +180,14 @@ check-sutra-rows:
 # sometimes right is worse than no guess: "I didn't set it and it passed"
 # would be indistinguishable from "I set it correctly".
 #
-# SAFETY CORRECTION (Till/RAMstein pilot, escalated by Alfred as family-
-# wide, not RAMstein-specific): the first cut defaulted SUTRA_CHECK_ARGS to
+# SAFETY CORRECTION (Till/ramstein pilot, escalated by Alfred as family-
+# wide, not ramstein-specific): the first cut defaulted SUTRA_CHECK_ARGS to
 # "--help", on the assumption that's a universally safe, recognized flag.
-# It is not. Three of RAMstein's four binaries hand-roll their own argument
+# It is not. Three of ramstein's four binaries hand-roll their own argument
 # parsing rather than using argparse, so an unrecognized "--help" falls
 # through to their DEFAULT VERB -- for ramstein/ramstein-healthcheck that
 # means `make check` makes a REAL socket call to the LIVE daemon on every
-# single run. Harmless there by RAMstein's own security model, but a pill
+# single run. Harmless there by ramstein's own security model, but a pill
 # whose default verb has a non-idempotent side effect would have this guard
 # silently perform that side effect forever, unnoticed, because nothing
 # about "the guard failed to print help" looks like an incident. tjmax's
@@ -293,9 +293,9 @@ check-vendored-path:
 	printf '%s\n' "$$_SUTRA_CHECK_VENDORED_PATH_PY" | python3 - "$(SUTRA_CHECK_BIN)" "$(SUTRA_CHECK_MODULE)" "$$expected"
 
 # --- check-vendored-path-all: the same guard, across every binary ---------
-# PILOT FIX 2 (Till/RAMstein): check-vendored-path validates exactly one
+# PILOT FIX 2 (Till/ramstein): check-vendored-path validates exactly one
 # SUTRA_CHECK_BIN per invocation. Any pill with more than one sutra-
-# importing binary -- RAMstein has four -- needs a loop, and left to each
+# importing binary -- ramstein has four -- needs a loop, and left to each
 # pill that becomes another hand-written supplement (Till wrote
 # check-vendored-path-all with four $(MAKE) calls; that duplication across
 # five pills is exactly what this file exists to prevent). Takes a list
@@ -349,7 +349,7 @@ check-vendored-path-all:
 # SUTRA_PACKAGES_VERIFY_AGAINST -- same doctrine as SUTRA_CHECK_BIN above:
 # a pill's real Depends line lives in a static packaging/debian/control
 # for some pills (coldspot, phanspeed) and inside an inline Makefile
-# heredoc for others (byebyte, RAMstein, kast); no single guess is right
+# heredoc for others (byebyte, ramstein, kast); no single guess is right
 # for both shapes, and a wrong guess that's sometimes right is worse than
 # refusing to guess.
 #
@@ -362,7 +362,7 @@ check-vendored-path-all:
 # A bare-name-only file like kast's works today; a pill CANNOT SAFELY
 # ADOPT this file's inline-comment style if anything else machine-parses
 # the same file without first stripping trailing comments. Checked family-
-# wide: byebyte/RAMstein/coldspot/phanspeed/gestalt have no second
+# wide: byebyte/ramstein/coldspot/phanspeed/gestalt have no second
 # consumer; kast alone does. RULE: before a pill's packages.txt gains
 # inline comments, confirm nothing besides this parser reads the file
 # directly, or fix that consumer to strip trailing `#...` first (one

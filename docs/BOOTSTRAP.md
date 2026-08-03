@@ -112,7 +112,7 @@ include src/share/<pill-name>/lib/sutra.mk
 after that resolves relative to its *own* vendored location
 (`$(lastword $(MAKEFILE_LIST))` at include-time), never to the including
 Makefile's. The fully-adopted reference, nothing hand-rolled left, is
-`RAMstein/Makefile:10-36`:
+`ramstein/Makefile:10-36`:
 
 ```makefile
 PILL := ramstein
@@ -144,11 +144,11 @@ real adoptions have already hit why, below.
    `path:module`) the moment there's more than one.
 2. **`SUTRA_CHECK_ARGS` — no flag is safe by assumption.** The first cut
    defaulted to `--help` as universally safe. It is not: three of
-   RAMstein's four binaries hand-roll their own argument parsing instead
+   ramstein's four binaries hand-roll their own argument parsing instead
    of using `argparse`, so an unrecognized `--help` falls through to
    their *default verb* — for `ramstein`/`ramstein-healthcheck` that
    means `make check` makes a REAL socket call to the LIVE daemon, every
-   run. Harmless under RAMstein's own security model; a pill whose
+   run. Harmless under ramstein's own security model; a pill whose
    default verb has a non-idempotent side effect would have this guard
    perform it silently, forever. Left empty (the default), the
    real-subprocess sanity call is skipped entirely and the guard relies

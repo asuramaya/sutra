@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.12.9 — RAMstein renamed to ramstein, family-wide (2026-08-03)
+
+Operator order, via Alfred (msg 3466): `RAMstein` becomes `ramstein` —
+mixed-case was a fatal error at inception, in the operator's own words.
+This REVERSES the 0.12.5 entry's own ruling that `RAMstein` "stays
+mixed-case — that's its real name"; see the superseding note appended
+to that entry rather than the entry being rewritten out from under it.
+
+- **61 occurrences swept across the 8 files Alfred identified**:
+  `docs/CHANGELOG.md` (33), `sutra.mk` (13), `.github/workflows/pill-ci.yml`
+  (5), `docs/BOOTSTRAP.md` (3), `sutra.py` (3), `README.md` (2 lines / 3
+  tokens — one line links both text and URL), `pill.js` (1),
+  `sutra_xen.py` (1). Alfred had already grepped `*.py`/`*.mk`/`*.sh`/
+  `*.yml` for a name-derivation branch (`if pill == "RAMstein"`) and
+  found none — verified independently before sweeping rather than taken
+  on report: every hit across all 8 files is prose or a comment, none
+  of them logic.
+- **`docs/CHANGELOG.md:157` excluded from the blind substitution.** It
+  isn't a mention, it's the 0.12.5 entry recording the PRIOR ruling
+  ("`RAMstein` stays mixed-case — that's its real name"). A global sed
+  there would have turned a historical record into a false,
+  self-contradicting one. Left exactly as originally written; a
+  superseding note appended immediately after it, dated, pointing back
+  to this entry.
+- **Verified name-only** the way Alfred asked: for each of the 8 files,
+  `git show HEAD:<file> | sed 's/RAMstein/ramstein/g'` diffed against
+  the actual edit — identical on all 8 (`CHANGELOG.md`'s line 157
+  excluded from that substitution by construction, before the diff).
+  Zero collateral edits.
+- **Per-file version constants bumped** for the vendored files whose
+  bytes changed: `SUTRA_VERSION` 0.3.1 -> 0.3.2, `SUTRA_XEN_VERSION`
+  0.1.1 -> 0.1.2, `PILL_JS_VERSION` 0.1.1 -> 0.1.2 — comment-only edits,
+  no carve-out, per the 0.12.5 precedent. `sutra.mk` has no version
+  constant of its own (not tracked by `tests/check_version.sh`) but is
+  vendored by hash the same way.
+
+`sutra.mk`, `sutra.py` and `sutra_xen.py` are vendored into all six
+pills; this canonical fix does not touch a single consuming repo's own
+copy — those ride the existing re-vendor wave (`a8de30f9`), the same
+call Alfred made for 0.12.5 and 0.12.6, not a second wave. `make check`
+green.
+
 ## 0.12.8 — the GNOME extension syntax gate has never checked anything (2026-08-03)
 
 Till found, Alfred verified (msg 3410): `node --check <path>` on a plain
@@ -54,7 +96,7 @@ only by `grep -Ev '^\s*(#|$)'` — drops whole-comment and blank lines, but does
 NOT strip a trailing inline `# comment` off an otherwise-real line. kast's
 file has always been bare-name-only; that isn't a missing convention, it's a
 constraint its own installer imposes. checked family-wide (Alfred): byebyte,
-RAMstein, coldspot, phanspeed and gestalt have no second consumer of the
+ramstein, coldspot, phanspeed and gestalt have no second consumer of the
 file — kast alone does.
 
 The 0.12.6 parser is unaffected — split-on-first-`#` yields the bare token
@@ -84,17 +126,17 @@ openssh-client plus documented domain exemptions), everything else is
 a headless `apt install <pill>` must never pull GNOME Shell), build-time
 deps appear in neither tier. `packages.txt` becomes the generated source
 of `control` so the two can't drift again — measured cause: two of five
-pills (byebyte, RAMstein) documented an optional tier their shipped
+pills (byebyte, ramstein) documented an optional tier their shipped
 artifact never emitted, and the audit that found it independently missed
 `Recommends:` on a third (coldspot) by grepping only `Depends:`.
 
 Measured before building (msg 3364, shape confirmed msg 3365):
 `packages.txt` is less uniform than the dispatch assumed — only three of
-five pills (byebyte, RAMstein, phanspeed) already share a `# --- hard
+five pills (byebyte, ramstein, phanspeed) already share a `# --- hard
 (...) ---` / `# --- optional (...) ---` header-comment convention;
 coldspot's optional tier was package names written *inside* a comment
 body (unparseable), kast had no hard/optional split in the file at all.
-Control generation also splits two ways: byebyte/RAMstein/kast build
+Control generation also splits two ways: byebyte/ramstein/kast build
 `control` from an inline Makefile heredoc with a hardcoded string
 (`packages.txt` not consulted at all); coldspot/phanspeed ship a static
 `packaging/debian/control`.
@@ -155,28 +197,32 @@ instructed. `make check` green (15 rows).
 Operator order, via Alfred (msg 3319): `byebyte` must be spelled
 consistently across all files, matching the operator's 2026-07-31 ratified
 name (lowercase; `RAMstein` stays mixed-case — that's its real name).
+**Superseded 2026-08-03:** the operator reversed the `RAMstein` exception
+itself — see the 0.12.9 entry below. The line above is left exactly as
+written to record what was actually ruled on 2026-08-02; it is no longer
+the current rule.
 sutra carried mixed-case `ByeByte` in 8 files.
 
 - **`sutra_update.py:9`** — `slug="asuramaya/ByeByte"` in the usage-example
   comment, corrected to `slug="asuramaya/byebyte"`. This one blocks every
   consuming repo from fixing it locally: the file is byte-identical
-  (sha256 `fbcd892e...`) in sutra, byebyte, RAMstein, phanspeed and
+  (sha256 `fbcd892e...`) in sutra, byebyte, ramstein, phanspeed and
   coldspot, and `check-sutra` verifies that hash — a pill hand-editing its
   own copy would fail its own integrity check. Has to change canonically
   and re-vendor. `SUTRA_UPDATE_VERSION` moved 0.1.0 -> 0.1.1 per the
   per-file-version-tracks-bytes rule (`.github/CONTRIBUTING.md`,
   mechanically enforced by `tests/check_version.sh` — no carve-out for
   "just a comment"). New sha256: `10d6854a...`.
-- **`pill.js:16`** — `(ByeByte thinks in weeks, RAMstein in seconds)`,
+- **`pill.js:16`** — `(ByeByte thinks in weeks, ramstein in seconds)`,
   corrected to lowercase. Found in the same sweep, same shape Alfred
   named for `sutra_update.py` but didn't catch here: byte-identical
-  (sha256 `c22472ed...`) in sutra, byebyte, RAMstein, phanspeed and
+  (sha256 `c22472ed...`) in sutra, byebyte, ramstein, phanspeed and
   coldspot (kast has no `pill.js`), verified by `check-sutra` via
   `SUTRA_EXT_DIR`. Same blocking shape, same fix, same four consuming
   repos. `PILL_JS_VERSION` moved 0.1.0 -> 0.1.1. New sha256:
   `cd726e2b...`.
 - **`sutra.py:3,166,298,335`** — four prose mentions, lowercased. Also
-  byte-identical across all six pills (byebyte, RAMstein, coldspot,
+  byte-identical across all six pills (byebyte, ramstein, coldspot,
   phanspeed, kast, gestalt), same shape as the two above, wider blast
   radius. `SUTRA_VERSION` moved 0.3.0 -> 0.3.1. New sha256:
   `8c5b0095...`.
@@ -207,7 +253,7 @@ re-vendors. But `sutra.py`, `sutra_update.py` and `pill.js` all moved
 mentions were named as "just prose" but are byte-identical across all
 six pills same as the other two), so the parked re-vendor wave (thread
 `a8de30f9`, previously measured metadata-only) now carries a real
-three-file change: byebyte/RAMstein/phanspeed/coldspot for all three
+three-file change: byebyte/ramstein/phanspeed/coldspot for all three
 files, plus kast and gestalt for `sutra.py` alone. Pairing the two waves
 rather than running separate ones, per Alfred's instruction.
 
@@ -351,12 +397,12 @@ instruction — correct for 0.10.1-era gestalt, false at 0.12.0 where
 
 - **`sutra.mk` is now documented as the adopted route.** New "The recipe
   layer: sutra.mk" section: the `PILL` / `SUTRA_EXT_DIR` /
-  `SUTRA_CHECK_BIN(S)` / `include` shape, with `RAMstein/Makefile:10-36`
+  `SUTRA_CHECK_BIN(S)` / `include` shape, with `ramstein/Makefile:10-36`
   cited as the fully-adopted reference (nothing hand-rolled left).
 - **The three no-default traps now live in the doc itself**, not only in
   sutra.mk's own comments: `SUTRA_CHECK_BIN`/`SUTRA_CHECK_BINS` has no
   default (defect 5 — `src/bin/$(PILL)` is wrong for kast/phanspeed);
-  `SUTRA_CHECK_ARGS` has no default (a `--help` default made RAMstein's
+  `SUTRA_CHECK_ARGS` has no default (a `--help` default made ramstein's
   guard issue a real socket call to the live daemon on every `make check`);
   `pill.js` wants `SUTRA_EXT_DIR` set, not a hand-extended loop underneath
   sutra.mk.
@@ -383,8 +429,8 @@ rather than by sutra validating the artifacts against itself. Landed
 together because defect 7 generalizes the shape underneath the other two
 (and underneath 3/4/6 before them) and changes how they're fixed.
 
-- **Defect 7 (Till/RAMstein, independently tjmax): gated CI steps skipped
-  silently.** `run-attack` defaulted false; RAMstein's `make attack` was
+- **Defect 7 (Till/ramstein, independently tjmax): gated CI steps skipped
+  silently.** `run-attack` defaulted false; ramstein's `make attack` was
   never actually run in CI from Till's first pilot commit onward. He ran
   it by hand every time (it passed) and CI was green every time — neither
   signal said the check hadn't run in CI at all. He only found it reading
@@ -423,7 +469,7 @@ together because defect 7 generalizes the shape underneath the other two
   broken second file: the run correctly fails, naming the right file.
 
 Adoption state at time of writing (per Alfred): phanspeed and kast are on
-0.11.1, ByeByte just re-vendored to it, RAMstein is re-vendoring off
+0.11.1, ByeByte just re-vendored to it, ramstein is re-vendoring off
 0.10.1, coldspot has not adopted. Four pills need a re-vendor for defect
 5; only kast currently carries a workaround for defect 6.
 
@@ -461,9 +507,9 @@ that the run exited 0) — "skipped" and "passed" are different outcomes and
 only one is coverage; that assertion is the one that would have caught
 this the first time.
 
-## 0.11.0 — four defects from RAMstein's real pilot adoption, plus a safety fix escalated family-wide (2026-08-01)
+## 0.11.0 — four defects from ramstein's real pilot adoption, plus a safety fix escalated family-wide (2026-08-01)
 
-Till's RAMstein pilot (msg 2739 via Alfred) is the first REAL, independently-
+Till's ramstein pilot (msg 2739 via Alfred) is the first REAL, independently-
 built consumer of sutra.mk/pill-ci.yml — sutra validating the artifacts
 against itself, and against a fake pill built from the same head that
 authored them, could not surface any of these; both share the author's own
@@ -471,7 +517,7 @@ assumptions by construction.
 
 - **check-sutra dropped pill.js.** The vendored-.py loop covered only
   sutra/sutra_update/sutra_xen; three of four pills with a hand-written
-  check-sutra today (ByeByte, phanspeed, RAMstein) also check pill.js, per
+  check-sutra today (ByeByte, phanspeed, ramstein) also check pill.js, per
   BOOTSTRAP.md's own escape hatch that never made it into the generalized
   form. Verbatim adoption would have silently deleted an existing guard.
   Fixed: `SUTRA_EXT_DIR` opts a pill in; pill.js gets the same
@@ -479,7 +525,7 @@ assumptions by construction.
   loop body. Empty (the default) skips it exactly like a pill with no
   extension should.
 - **check-vendored-path validated only one binary per call.** Any pill
-  with more than one sutra-importing binary (RAMstein has four) needed a
+  with more than one sutra-importing binary (ramstein has four) needed a
   hand-written loop — precisely the duplication this file exists to
   prevent. Fixed: new `check-vendored-path-all` target takes
   `SUTRA_CHECK_BINS`, a space-separated list of `bin` or `bin:module`
@@ -489,17 +535,17 @@ assumptions by construction.
   `shellcheck-files`/`shellcheck-exclude` inputs and a real step.
 - **run-check-version defaulted to true and called a target no pill has.**
   Checked all five: none define `check-version`. Worse than merely
-  absent — RAMstein's own check-repo enforces the *opposite* convention on
+  absent — ramstein's own check-repo enforces the *opposite* convention on
   purpose (a single `packaging/VERSION`, no per-file literal at all).
   Adopting with defaults would have hard-failed every pill's first CI run.
   Defaulted to false; sutra remains the only real consumer.
 - **Safety fix, escalated by Alfred as family-wide rather than
-  RAMstein-specific.** `SUTRA_CHECK_ARGS` defaulted to `--help`, assumed
-  universally safe. It isn't: three of RAMstein's four binaries hand-roll
+  ramstein-specific.** `SUTRA_CHECK_ARGS` defaulted to `--help`, assumed
+  universally safe. It isn't: three of ramstein's four binaries hand-roll
   argument parsing rather than using argparse, so an unrecognized
   `--help` falls through to their default verb — for ramstein/
   ramstein-healthcheck that meant `make check` making a real socket call
-  to the live daemon on every run. Harmless there by RAMstein's own
+  to the live daemon on every run. Harmless there by ramstein's own
   security model, but a pill whose default verb has a non-idempotent
   side effect would have this guard silently perform it forever,
   unnoticed. tjmax's actual pattern (phanspeed `Makefile:38-42`) never
@@ -629,7 +675,7 @@ assumptions by construction.
   from the binary's own location (`src/bin/<pill>` only ever resolves to
   `src/share/<pill>/lib`, by the same arithmetic that makes it
   prefix-agnostic at install time), so the repo-tree location isn't a
-  choice the way the packaging destination is. RAMstein and ByeByte
+  choice the way the packaging destination is. ramstein and ByeByte
   landed on the correct shape independently; coldspot followed the
   doc's stated latitude and broke. Caught by Alfred within the hour
   (third instance this week of a doc naming a goal and leaving the
@@ -653,7 +699,7 @@ assumptions by construction.
   sutra_xen.py byte-identical into a SHARED system directory (/usr/bin
   via .deb, /usr/local/bin via install.sh) under the same filenames.
   Six of six. Any two pills installed together collide: dpkg refuses
-  the second outright (Till's finding — RAMstein's .deb refused because
+  the second outright (Till's finding — ramstein's .deb refused because
   phanspeed's already owned /usr/bin/sutra.py); install.sh's plain
   `install` has no ownership tracking and silently overwrites, anchors
   included. Measured on the operator's own machine: /usr/bin/sutra.py
@@ -754,7 +800,7 @@ assumptions by construction.
 - Bug found by Alfred within minutes of 0.7.2 shipping: that release
   touched only `.gitignore`/`CHANGELOG.md`/`README.md`/`VERSION` — zero
   code — and every pill carrying the LAG/DRIFT check-sutra recipe
-  (ByeByte, RAMstein, kast) immediately reported LAG, including kast,
+  (ByeByte, ramstein, kast) immediately reported LAG, including kast,
   which had re-vendored the day before and whose `sutra.py` bytes were
   still byte-identical to canonical. The recipe (decision d51e090f)
   compared the vendored `.commit` anchor against canonical **repo**
@@ -779,7 +825,7 @@ assumptions by construction.
   comparison target in each pill's `check-sutra` Makefile target
   changes; `vendor.sh`'s header comment updated to describe it
   correctly. Recipe recorded in osiris (thread 0627dac7); ByeByte,
-  RAMstein and kast each pick up the corrected version at their own
+  ramstein and kast each pick up the corrected version at their own
   next touch, same non-big-bang Wave B pace as the original rollout —
   the false LAG is cosmetic (integrity's sha256 gate never depended on
   it) so nothing is urgently broken in the meantime.
@@ -801,7 +847,7 @@ assumptions by construction.
 
 ## 0.1.0 — the backbone extracted
 - sutra.py: the shared pill runtime, factored from ByeByte (the reference)
-  and confirmed identical in RAMstein: ControlServer (SO_PEERCRED-gated
+  and confirmed identical in ramstein: ControlServer (SO_PEERCRED-gated
   newline-JSON socket), load_config (seed-never-master, typed+clamped),
   write_status (atomic 0640), ewma_rate (smoothed burn), request/read_status
   (client side), runtime_paths/stop_event.
@@ -818,7 +864,7 @@ assumptions by construction.
 - Grown to the whole family after surveying all six. The pills are three
   deployment models, not one — sutra now covers all three:
   * ControlServer authz is pluggable: `allow_uids({...})` (the uid model —
-    ByeByte, RAMstein, phanspeed) or `allow_group("coldspot")` (the
+    ByeByte, ramstein, phanspeed) or `allow_group("coldspot")` (the
     group-membership model — coldspot's `_peer_allowed`, absorbed verbatim:
     root, else primary group or listed member, default deny).
   * `socket_owner=(uid, gid)` and `write_status(..., owner=(uid, gid),
@@ -841,7 +887,7 @@ assumptions by construction.
 ## 0.3.0 — pill.js, the extension commons (2026-07-20)
 
 - pill.js: the shape every GNOME pill repeats (UNIFY.md Wave A #2), factored
-  from all five extensions — the ByeByte/RAMstein verbatim twins were the
+  from all five extensions — the ByeByte/ramstein verbatim twins were the
   seed; coldspot contributed the flush-right list idiom, phanspeed the
   update surface, gestalt the socket writer. Exports: the family palette +
   chip/dot styles · isObj/num/esc/fmtBytes · readStatusFile + the 3×poll+5
@@ -864,7 +910,7 @@ assumptions by construction.
 
 - `check_health(status_path, socket_path)`: the two-check vitals verdict
   every healthcheck bin repeated by hand (UNIFY.md Wave A #3) — factored
-  from ByeByte's and RAMstein's near-identical originals. Freshness judged
+  from ByeByte's and ramstein's near-identical originals. Freshness judged
   against the daemon's OWN declared `poll_interval` (never a magic number),
   same 3x+5s slack as pill.js's `isStale` so a stale status reads
   identically from a CLI healthcheck and a GNOME pill; then a `ping` over
@@ -902,7 +948,7 @@ assumptions by construction.
   * `balloon_target_kb()` / `balloon_headroom_kb()` — the xen_memory sysfs
     surface (`target_kb` vs `/proc/meminfo`'s MemTotal); the gap is real
     machinery (memory the balloon driver hasn't onlined yet), not noise —
-    RAMstein's balloon-aware totals need `target_kb` as the ceiling, never
+    ramstein's balloon-aware totals need `target_kb` as the ceiling, never
     MemTotal. Pure guest-local reads, zero contract dependency.
   * `refresh_host_telemetry()` — the guest-side cache half of the dom0
     seam: an injected `fetch` callable's return value gets cached to a
@@ -991,7 +1037,7 @@ assumptions by construction.
   0/3 on the family's standard community-file set (every pill is 4/4;
   sutra had README + CHANGELOG but not these three), flagged in a
   family-wide remote-presentation sweep. `CODE_OF_CONDUCT.md` matches the
-  family's own short-form template verbatim (ByeByte/phanspeed/RAMstein
+  family's own short-form template verbatim (ByeByte/phanspeed/ramstein
   already agree on it; kast's longer Contributor Covenant text is the
   outlier). `CONTRIBUTING.md`/`SECURITY.md` are sutra-specific, not
   copied: sutra isn't a daemon like the pills, so both describe what
