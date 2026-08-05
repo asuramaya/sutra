@@ -70,8 +70,18 @@ marker for the LAG-vs-DRIFT read ("is this copy at or after the file's own
 last commit"). Neither one was ever an authenticity claim, and neither needs
 a signed commit to do its job — authenticity, when it matters, belongs at the
 tag/release boundary, which is where the FAMILY's sealing ritual lives (see
-any sealed pill's own `docs/RELEASING.md`). sutra itself has no such
-boundary — see `docs/RELEASING.md` and the exemptions table below for why.
+any sealed pill's own `docs/RELEASING.md`). sutra itself has no *release*
+boundary — see `docs/RELEASING.md` and the exemptions table below for why —
+but it now has a narrower one of its own (0.13.0, msg 3744 via Alfred):
+`vendor.sh` refuses to copy an unattested canonical state, checking whether
+a tag containing HEAD verifies against `packaging/release-signing/
+allowed_signers`. This is a VENDORING-PROVENANCE checkpoint, not a release —
+no `.deb`, no tarball, no GitHub release, no `release.yml`; the tag exists
+solely to answer "did a human holding the key approve copying this state
+into six pills," nothing about a packaged artifact. It closes the gap
+*upstream* of the pill's own release signature, which remains the
+user-facing control — see `sutra.mk`'s own `check-sutra` comment for what
+this explicitly does and does not cover.
 
 ## Standard exemptions
 

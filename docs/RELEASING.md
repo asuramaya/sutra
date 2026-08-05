@@ -18,9 +18,21 @@ stronger than a repo-level signature checked once at download.
 
 `packaging/VERSION` remains sutra's own release counter, bumped on every
 meaningful change (`sutra/Makefile`'s own comment: it "is free to move
-independently" of any per-file version constant) — but it is never tagged
-or sealed. There is no `.github/workflows/release.yml` here, and there
-will not be one.
+independently" of any per-file version constant) — but it is never *sealed*.
+There is no `.github/workflows/release.yml` here, and there will not be one.
+
+**0.13.0 update — sutra now supports git tags, and this does not reverse
+the ruling above.** `vendor.sh` can refuse to vendor an unattested canonical
+commit unless a tag containing it verifies against `packaging/
+release-signing/allowed_signers` (`docs/ARCHITECTURE.md`'s "Commit signing"
+section, `sutra.mk`'s `check-sutra` comment). That tag is a
+VENDORING-PROVENANCE checkpoint — "a human holding the key approved copying
+this state into six pills" — never a release: no `.deb`, no tarball, no
+`SHA256SUMS`, no GitHub release, still no `release.yml`. Nothing about a
+packaged artifact changes here. Named explicitly because this exact
+ambiguity nearly produced release machinery once already (see below) —
+a tag existing in this repo's history is not itself evidence that the
+"no release" ruling has moved.
 
 ## What actually blocked, and what it means that it lifted
 
@@ -45,8 +57,11 @@ because sutra was never structurally eligible for one.
 
 - No release, sealed or otherwise, of sutra itself. If a future ruling
   changes this, it corrects `RELEASE.md:201` explicitly, by line, before
-  any release machinery gets written here — not the reverse.
-- `make check` (`smoke` + `attack` + `check-version` + `check-repo`) green
-  before every commit, same as any other change. sutra's trust story is
-  continuous per-file verification, not a point-in-time ceremony — there
-  is no "before tagging" here to gate anything on.
+  any release machinery gets written here — not the reverse. A
+  vendoring-provenance tag (0.13.0, see above) is not release machinery and
+  does not count as one.
+- `make check` (`smoke` + `attack` + `check-version` + `check-repo` +
+  `check-signing`) green before every commit, same as any other change.
+  sutra's trust story is continuous per-file verification, not a
+  point-in-time ceremony — there is no "before tagging" here to gate
+  anything on.

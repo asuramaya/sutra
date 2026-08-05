@@ -1,11 +1,18 @@
 # sutra — the shared pill backbone
-.PHONY: smoke attack check-version check-repo check vendor
+.PHONY: smoke attack check-version check-repo check-signing check vendor
 
 smoke:
 	bash tests/smoke.sh
 
 attack:
 	python3 tests/attack_socket.py
+
+# fixture-only, no network, no real keys (msg 3744 via Alfred) -- proves
+# vendor.sh's signed-canonical guard and check-sutra's provenance line
+# actually distinguish signed from unsigned canonical state, negative
+# control first. See tests/signing_smoke.sh's own header for the full shape.
+check-signing:
+	bash tests/signing_smoke.sh
 
 # a vendored file's own version constant must move whenever the file's own
 # bytes do; the repo VERSION release counter is free to move independently
@@ -72,7 +79,7 @@ check-repo:
 	fi; \
 	if [ "$$fail" -eq 0 ]; then echo "check-repo: all mechanical checks passed"; else exit 1; fi
 
-check: smoke attack check-version check-repo
+check: smoke attack check-version check-repo check-signing
 
 # vendor sutra into a pill's private lib dir (see docs/BOOTSTRAP.md — DEST is
 # never a shared bin/):  make vendor DEST=<pill>/share/<pill>/lib

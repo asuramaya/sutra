@@ -1,5 +1,95 @@
 # Changelog
 
+## 0.13.0 — vendor.sh refuses an unattested commit; check-sutra reports provenance (2026-08-05)
+
+The supply-chain gap found while designing the update service (msg 3744
+via Alfred): sutra is vendored BYTE-IDENTICAL into six pills and, until
+now, nothing ever asked whether the canonical state being copied was
+approved by a human holding a key. `vendor.sh` recorded whatever sha256
+sat in the checkout AT VENDOR TIME as authoritative; a compromised
+canonical checkout would poison that hash permanently, every later
+`check-sutra` would pass forever after (integrity only proves the copy
+MATCHES what was recorded, never that what was recorded was GOOD), and six
+pills would sign and ship the poison with VALID signatures — not forged,
+correctly attesting "the operator released this." The operator would just
+have released poison unknowingly. Vajra is arming sutra's real anchor and
+teaching mudra `git tag -s` in parallel; this is the consuming half.
+
+- **`vendor.sh` refuses to vendor an unattested HEAD.** Resolves the tag
+  containing HEAD (`git tag --contains`), verifies it with `git verify-tag`
+  against `packaging/release-signing/allowed_signers`. No tag verifies →
+  refuse (exit 1), nothing written. NOT MADE ABSOLUTE, per Alfred's
+  explicit instruction: `SUTRA_VENDOR_ALLOW_UNSIGNED=1` vendors an
+  untagged dev fix anyway, WARNS to stderr, and writes `unsigned` as a
+  second line in every `.commit` anchor it produces — visible forever
+  after, never silent, same doctrine as the LAG warning and byebyte's
+  PENDING contract.
+- **Pre-arming state is INERT, not a refusal.** An empty or absent
+  `packaging/release-signing/allowed_signers` skips the guard entirely —
+  same armed/unarmed doctrine `sutra_update.py`'s own `armed()` already
+  applies to this exact anchor shape. Ordinary vendoring keeps working,
+  unchanged, while the anchor gets armed elsewhere in the family.
+- **`check-sutra` gained a provenance line, two independent signals,
+  neither ever fails the build** (UNKNOWN/warn/ok, graduated like
+  LAG/DRIFT, per Alfred's explicit instruction — a missing signature is a
+  fact worth surfacing, not grounds to block `make check`):
+  1. The static `unsigned` marker, read unconditionally — no canonical
+     checkout needed, works on a CI runner or contributor machine that
+     never has one.
+  2. A LIVE check, gated exactly like freshness (`$canon/.git` present):
+     is the recorded commit reachable from a tag that verifies against
+     canonical's OWN anchor, right now? Can report "ok" even for a commit
+     vendored unsigned at the time, if canonical was tagged and signed
+     LATER covering it — a retroactive human endorsement is real signal,
+     not staleness. Confirmed by test: the static marker stays `unsigned`
+     (a vendor-time fact) while the live check flips to `ok` once a
+     covering tag lands.
+- **A signed tag here is a VENDORING-PROVENANCE checkpoint, not a
+  release** — sutra still cuts no release of its own (`docs/RELEASING.md`,
+  `RELEASE.md:201` unchanged). Said explicitly, in both
+  `docs/RELEASING.md` and `docs/ARCHITECTURE.md`'s "Commit signing"
+  section, because this exact ambiguity nearly produced release machinery
+  once already (0.12.4's near-miss). Also said explicitly what this does
+  NOT do: it protects the VENDORING ACT, gated on a canonical checkout
+  existing beside the pill — never the end user installing a `.deb`, which
+  relies entirely on the pill's own release signature, the actual
+  user-facing control, one layer downstream of this one.
+- **Nothing asuramaya-specific**: no hardcoded org, no hardcoded pill
+  list, no assumed tag-naming scheme — any tag containing HEAD that
+  verifies against the repo's OWN `allowed_signers` satisfies the guard,
+  on any fork.
+- **`tests/signing_smoke.sh`** (new, wired into `make check` as
+  `check-signing`): fixture-only, throwaway ed25519 keys (mudra's own
+  `ssh-keygen -t ed25519` pattern, never a real or hardware key), real
+  `git init`/`tag -s`/`verify-tag`, never mocked. NEGATIVE CONTROL FIRST,
+  per Alfred's explicit instruction — proves the guard actually refuses an
+  unsigned commit against an armed anchor (asserts nothing was written)
+  before proving it passes a signed one. Also covers the bypass path (WARN
+  + marker), the live-check ladder (ok/warn/unknown), the retroactive-tag
+  case, and an adversarial case (a tag signed by a key NOT in
+  `allowed_signers` must not satisfy the guard). Verified the test has
+  teeth, not just "runs without crashing": temporarily disabled the
+  refuse branch, confirmed the suite goes red on exactly the negative
+  control and the adversarial case, restored, confirmed green again.
+- **A real `set -e` bug caught by running the test, not by reading the
+  diff**: `_sutra_write_commit_anchor`'s last line was
+  `[ -n "$VENDOR_UNSIGNED_MARK" ] && printf ...` — under `set -e`, a
+  false `[ -n ... ]` (the common case, mark unset) makes the `&&` list's
+  exit status nonzero, and being the function's last statement, aborted
+  the entire script the moment `_sutra_write_commit_anchor` ran for the
+  first time. Every unarmed/pre-arming vendor would have failed outright.
+  Fixed with a plain `if`, whose exit status is always 0 on a false
+  condition. Caught by actually vendoring into a fixture directory before
+  writing the test script, not by re-reading the diff.
+
+No vendored `.py`/`.js` module's own bytes changed — this touches
+`vendor.sh` and `sutra.mk` only, neither carrying a per-file version
+constant (`tests/check_version.sh` tracks `sutra.py`/`sutra_update.py`/
+`sutra_xen.py`/`pill.js` only). Root row count unchanged at 15 —
+`tests/signing_smoke.sh` lands inside the existing `tests/` row, not a new
+one. `make check` (now `smoke` + `attack` + `check-version` + `check-repo`
++ `check-signing`) green.
+
 ## 0.12.9 — RAMstein renamed to ramstein, family-wide (2026-08-03)
 
 Operator order, via Alfred (msg 3466): `RAMstein` becomes `ramstein` —

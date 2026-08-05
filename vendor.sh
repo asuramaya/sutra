@@ -80,6 +80,84 @@ if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1 &&
     exit 1
 fi
 
+# --- signed-canonical guard: refuse to vendor an unattested commit --------
+# The supply-chain gap this closes (found designing the update service,
+# dispatched via Alfred msg 3744): sutra is vendored BYTE-IDENTICAL into six
+# pills and, before this guard, nothing ever asked whether the canonical
+# state being copied was actually approved by a human holding a key. This
+# script recorded whatever sha256 sat in the checkout AT VENDOR TIME as
+# authoritative; a compromised canonical checkout would poison that hash
+# permanently, every later check-sutra would pass forever after (integrity
+# only proves the copy MATCHES what was recorded, never that what was
+# recorded was GOOD), and six pills would sign and ship the poison with
+# VALID signatures — not forged, correctly attesting "the operator released
+# this." The operator would just have released poison unknowingly.
+#
+# Same fail-closed shape as the dirty-tree guard above, one layer up: a tag
+# containing HEAD, verified with `git verify-tag` against this repo's own
+# packaging/release-signing/allowed_signers, is the human-approval
+# checkpoint. NOT MADE ABSOLUTE, on purpose (Alfred's explicit instruction):
+# vendoring an untagged dev fix is legitimate work, and a guard that blocks
+# it outright just gets worked around by whoever hits it next.
+# SUTRA_VENDOR_ALLOW_UNSIGNED=1 is the escape hatch — same doctrine as
+# SUTRA_EXT_DIR/SUTRA_CHECK_BIN elsewhere in this family, no default that's
+# sometimes wrong — and when it's used, that fact is written into the
+# vendored .commit anchor itself (a second line, "unsigned"), not just
+# printed to scrollback nobody rereads, so a consuming pill's check-sutra
+# reports it forever after, offline, with no canonical checkout required.
+# Visible, never silent: a guard that can be bypassed invisibly is worse
+# than no guard, because it manufactures false confidence (same doctrine as
+# the LAG warning and byebyte's PENDING contract).
+#
+# Pre-arming state (packaging/release-signing/allowed_signers empty or
+# absent) is INERT, not a refusal — the same armed/unarmed doctrine
+# sutra_update.py's own armed() already applies to this exact anchor file
+# shape: there is no key to check against yet, so nothing here can refuse
+# anything until the anchor is actually armed. This is what lets ordinary
+# vendoring keep working, unchanged, while the anchor gets armed and tags
+# start getting signed elsewhere in the family, in parallel — neither side
+# blocks the other.
+#
+# A signed tag here is a VENDORING-PROVENANCE CHECKPOINT, not a release —
+# sutra still cuts no release of its own (docs/RELEASING.md, RELEASE.md:201
+# unchanged by this). It attests only "a human holding the key approved
+# this canonical state for vendoring", nothing about a packaged artifact.
+#
+# NOTHING asuramaya-SPECIFIC: no hardcoded org, no hardcoded pill list, no
+# assumed tag-naming scheme — any tag containing HEAD that verifies against
+# this repo's OWN allowed_signers satisfies the guard, on any fork.
+VENDOR_UNSIGNED_MARK=""
+if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    _sutra_anchor="$SRC/packaging/release-signing/allowed_signers"
+    if [ -s "$_sutra_anchor" ]; then
+        _sutra_head="$(git -C "$SRC" rev-parse HEAD)"
+        _sutra_signed_tag=""
+        for _t in $(git -C "$SRC" tag --contains "$_sutra_head" 2>/dev/null); do
+            if git -C "$SRC" -c gpg.format=ssh \
+                   -c gpg.ssh.allowedSignersFile="$_sutra_anchor" \
+                   verify-tag "$_t" >/dev/null 2>&1; then
+                _sutra_signed_tag="$_t"
+                break
+            fi
+        done
+        if [ -n "$_sutra_signed_tag" ]; then
+            echo "vendor: canonical HEAD ($_sutra_head) covered by signed tag $_sutra_signed_tag"
+        elif [ "${SUTRA_VENDOR_ALLOW_UNSIGNED:-}" = "1" ]; then
+            echo "vendor: WARNING -- canonical HEAD ($_sutra_head) has no signed" \
+                 "tag covering it (SUTRA_VENDOR_ALLOW_UNSIGNED=1, vendoring anyway" \
+                 "-- recorded in the vendored .commit anchor)" >&2
+            VENDOR_UNSIGNED_MARK="unsigned"
+        else
+            echo "vendor: refusing -- canonical HEAD ($_sutra_head) has no signed" \
+                 "tag covering it. Tag and sign it first (git tag -s), or set" \
+                 "SUTRA_VENDOR_ALLOW_UNSIGNED=1 to vendor an untagged dev fix" \
+                 "anyway (the consuming pill's check-sutra will then report the" \
+                 "anchor as unsigned)." >&2
+            exit 1
+        fi
+    fi
+fi
+
 [ -d "$DEST" ] || { echo "vendor: $DEST is not a directory" >&2; exit 1; }
 ver="$(tr -d '[:space:]' < "$SRC/packaging/VERSION")"
 # The LAG-vs-DRIFT anchor: which canonical commit this vendor came from.
@@ -87,11 +165,22 @@ ver="$(tr -d '[:space:]' < "$SRC/packaging/VERSION")"
 # pill's check-sutra treats a missing .commit as "freshness unknown", not
 # a failure.
 commit="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
+# Writes a .commit anchor, plus a second "unsigned" line when the guard
+# above was bypassed with SUTRA_VENDOR_ALLOW_UNSIGNED=1 -- one place for
+# both, so every anchor pair below carries the mark consistently instead of
+# five call sites each remembering it separately.
+_sutra_write_commit_anchor() {
+    [ -n "$commit" ] || return 0
+    printf '%s\n' "$commit" > "$1"
+    if [ -n "$VENDOR_UNSIGNED_MARK" ]; then
+        printf '%s\n' "$VENDOR_UNSIGNED_MARK" >> "$1"
+    fi
+}
 
 cp "$SRC/sutra.py" "$DEST/sutra.py"
 sha="$(sha256sum "$SRC/sutra.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$sha" > "$DEST/sutra.version"
-[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra.commit"
+_sutra_write_commit_anchor "$DEST/sutra.commit"
 echo "vendored sutra $ver -> $DEST/sutra.py"
 echo "  $sha"
 # The update spine vendors the same way, its own drift anchor beside it.
@@ -99,7 +188,7 @@ echo "  $sha"
 cp "$SRC/sutra_update.py" "$DEST/sutra_update.py"
 usha="$(sha256sum "$SRC/sutra_update.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$usha" > "$DEST/sutra_update.version"
-[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra_update.commit"
+_sutra_write_commit_anchor "$DEST/sutra_update.commit"
 echo "vendored sutra_update -> $DEST/sutra_update.py"
 echo "  $usha"
 # Same for the Xen guest-surface reader — vendored unconditionally like the
@@ -107,7 +196,7 @@ echo "  $usha"
 cp "$SRC/sutra_xen.py" "$DEST/sutra_xen.py"
 xsha="$(sha256sum "$SRC/sutra_xen.py" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$xsha" > "$DEST/sutra_xen.version"
-[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra_xen.commit"
+_sutra_write_commit_anchor "$DEST/sutra_xen.commit"
 echo "vendored sutra_xen -> $DEST/sutra_xen.py"
 echo "  $xsha"
 # The recipe layer -- vendored under the same integrity chain as code, not
@@ -120,7 +209,7 @@ echo "  $xsha"
 cp "$SRC/sutra.mk" "$DEST/sutra.mk"
 msha="$(sha256sum "$SRC/sutra.mk" | cut -d' ' -f1)"
 printf '%s  %s\n' "$ver" "$msha" > "$DEST/sutra.mk.version"
-[ -n "$commit" ] && printf '%s\n' "$commit" > "$DEST/sutra.mk.commit"
+_sutra_write_commit_anchor "$DEST/sutra.mk.commit"
 echo "vendored sutra.mk -> $DEST/sutra.mk"
 echo "  $msha"
 
@@ -133,7 +222,7 @@ if [ $# -ge 2 ]; then
     cp "$SRC/pill.js" "$EXTDIR/pill.js"
     psha="$(sha256sum "$SRC/pill.js" | cut -d' ' -f1)"
     printf '%s  %s\n' "$ver" "$psha" > "$EXTDIR/pill.version"
-    [ -n "$commit" ] && printf '%s\n' "$commit" > "$EXTDIR/pill.commit"
+    _sutra_write_commit_anchor "$EXTDIR/pill.commit"
     echo "vendored pill.js -> $EXTDIR/pill.js"
     echo "  $psha"
 fi
