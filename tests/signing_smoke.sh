@@ -154,6 +154,64 @@ else
     say "vendor.sh: ADVERSARIAL ok -- a tag from an unlisted key does not satisfy the guard"
 fi
 
+# --- 8. SUTRA_VENDOR_KEY_HOME: an off-repo key directory, independent of
+# the in-repo anchor (msg 3775 via Alfred) -- trust-on-first-use in the
+# in-repo anchor means an attacker who owns the repo can replace the
+# anchor AND sign with their own key; a key living entirely outside the
+# repo cannot be touched that way. Uses its OWN keys (never the ones
+# already armed above) to prove this is a genuinely separate root, not
+# just re-checking the same anchor under a different name. ---------------
+mkdir -p "$T/keyhome" "$T/inrepo2"
+ssh-keygen -q -t ed25519 -N '' -C "keyhome-key" -f "$T/keyhome/id_kh"
+ssh-keygen -q -t ed25519 -N '' -C "inrepo2-key" -f "$T/inrepo2/id_ir"
+( cd "$T/canon" && printf 'sutra namespaces="sutra-release,git" %s %s inrepo2\n' \
+      "$(awk '{print $1}' "$T/inrepo2/id_ir.pub")" "$(awk '{print $2}' "$T/inrepo2/id_ir.pub")" \
+      > packaging/release-signing/allowed_signers \
+  && git add -A && git commit -qm "re-arm with a fresh in-repo key" )
+
+# 8a. Tag signed by the KEY-HOME key (not in the in-repo anchor at all) --
+# must verify via the key home, labeled as the stronger root.
+( cd "$T/canon" && git -c gpg.format=ssh -c user.signingkey="$T/keyhome/id_kh" \
+      tag -s v0.0.3 -m "key-home signed" )
+rm -rf "$T/dest6"; mkdir -p "$T/dest6"
+out=$( cd "$T/canon" && SUTRA_VENDOR_KEY_HOME="$T/keyhome" bash vendor.sh "$T/dest6" 2>&1 )
+rc=$?
+if [ "$rc" -eq 0 ] && echo "$out" | grep -q "strong root"; then
+    say "vendor.sh: SUTRA_VENDOR_KEY_HOME ok -- verifies against an off-repo key the in-repo anchor never had, labeled 'strong root'"
+else
+    die "SUTRA_VENDOR_KEY_HOME did not verify a tag signed by its own key:"$'\n'"$out"
+fi
+
+# 8b. Same HEAD, key home unset -- falls back to the in-repo anchor's OWN
+# key (v0.0.3 wasn't signed by it, but a fresh commit+tag with it should
+# still pass through the fallback path, labeled as the weaker check).
+( cd "$T/canon" && echo "# fallback probe" >> sutra.py && git add -A \
+  && git commit -qm "fallback probe" \
+  && git -c gpg.format=ssh -c user.signingkey="$T/inrepo2/id_ir" tag -s v0.0.4 -m "in-repo signed" )
+rm -rf "$T/dest7"; mkdir -p "$T/dest7"
+out=$( cd "$T/canon" && bash vendor.sh "$T/dest7" 2>&1 )
+rc=$?
+if [ "$rc" -eq 0 ] && echo "$out" | grep -q "weaker, trust-on-first-use"; then
+    say "vendor.sh: SUTRA_VENDOR_KEY_HOME unset -- falls back to the in-repo anchor, labeled 'weaker'"
+else
+    die "unset SUTRA_VENDOR_KEY_HOME did not fall back correctly:"$'\n'"$out"
+fi
+
+# 8c. Key home SET but pointing at a directory with an UNRELATED key, and
+# HEAD genuinely unsigned by anything in either root -- must still refuse
+# (negative control for the new code path specifically, not just reusing
+# case 3's fixture).
+mkdir -p "$T/wrong_kh"
+ssh-keygen -q -t ed25519 -N '' -C "wrong-key" -f "$T/wrong_key"
+cp "$T/wrong_key.pub" "$T/wrong_kh/"
+( cd "$T/canon" && echo "# unsigned again" >> sutra.py && git add -A && git commit -qm "unsigned once more" )
+rm -rf "$T/dest8"; mkdir -p "$T/dest8"
+if ( cd "$T/canon" && SUTRA_VENDOR_KEY_HOME="$T/wrong_kh" bash vendor.sh "$T/dest8" ) >"$T/log8" 2>&1; then
+    die "vendor.sh vendored an unsigned commit with SUTRA_VENDOR_KEY_HOME pointed at an unrelated key"
+else
+    say "vendor.sh: SUTRA_VENDOR_KEY_HOME negative control ok -- an unrelated off-repo key does not satisfy the guard either"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
     echo "SIGNING SMOKE OK"
 else

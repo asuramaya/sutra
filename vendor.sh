@@ -126,22 +126,62 @@ fi
 # NOTHING asuramaya-SPECIFIC: no hardcoded org, no hardcoded pill list, no
 # assumed tag-naming scheme — any tag containing HEAD that verifies against
 # this repo's OWN allowed_signers satisfies the guard, on any fork.
+#
+# TRUST-ON-FIRST-USE, AND AN OPT-IN STRONGER ROOT (msg 3775 via Alfred):
+# $_sutra_anchor above lives INSIDE the repo it validates -- it catches a
+# LATER compromise if you already hold a known-good copy, but an attacker
+# who owns the repo can replace the anchor with their own key AND sign a
+# tag with that key, and verify-tag passes. SUTRA_VENDOR_KEY_HOME, if set,
+# points at a directory of `*.pub` files living OFF-REPO (never committed,
+# a CI runner can never reach it, the operator's own canonical key home) --
+# verifying against those directly is strictly stronger, since the root
+# then sits outside anything a repo compromise can touch. Tried FIRST, per
+# candidate tag, before the in-repo anchor. Unset by default and sutra
+# names no path of its own for it (nothing asuramaya-specific) -- mirrors
+# the SHAPE of mudra's own MUDRA_KEY_HOME without coupling to it by name,
+# since sutra has no reason to know mudra's env var exists. Same principal/
+# namespace as the in-repo anchor ("sutra", "sutra-release,git") -- the
+# pubkey's own file name never matters, only its content.
+_sutra_verify_tag_against() {
+    # $1 = anchor file (allowed_signers-shaped), $2 = tag name.
+    git -C "$SRC" -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$1" \
+        verify-tag "$2" >/dev/null 2>&1
+}
+
 VENDOR_UNSIGNED_MARK=""
 if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     _sutra_anchor="$SRC/packaging/release-signing/allowed_signers"
-    if [ -s "$_sutra_anchor" ]; then
+    _sutra_kh="${SUTRA_VENDOR_KEY_HOME:-}"
+    _sutra_kh_anchor=""
+    if [ -n "$_sutra_kh" ] && [ -d "$_sutra_kh" ]; then
+        for _pub in "$_sutra_kh"/*.pub; do
+            [ -e "$_pub" ] || continue
+            if [ -z "$_sutra_kh_anchor" ]; then
+                _sutra_kh_anchor="$(mktemp)"
+                trap 'rm -f "$_sutra_kh_anchor"' EXIT
+            fi
+            printf 'sutra namespaces="sutra-release,git" %s\n' "$(cat "$_pub")" >> "$_sutra_kh_anchor"
+        done
+    fi
+    if [ -s "$_sutra_anchor" ] || [ -n "$_sutra_kh_anchor" ]; then
         _sutra_head="$(git -C "$SRC" rev-parse HEAD)"
         _sutra_signed_tag=""
+        _sutra_verify_label=""
         for _t in $(git -C "$SRC" tag --contains "$_sutra_head" 2>/dev/null); do
-            if git -C "$SRC" -c gpg.format=ssh \
-                   -c gpg.ssh.allowedSignersFile="$_sutra_anchor" \
-                   verify-tag "$_t" >/dev/null 2>&1; then
+            if [ -n "$_sutra_kh_anchor" ] && _sutra_verify_tag_against "$_sutra_kh_anchor" "$_t"; then
                 _sutra_signed_tag="$_t"
+                _sutra_verify_label="off-repo key home ($_sutra_kh) -- strong root"
+                break
+            fi
+            if [ -s "$_sutra_anchor" ] && _sutra_verify_tag_against "$_sutra_anchor" "$_t"; then
+                _sutra_signed_tag="$_t"
+                _sutra_verify_label="in-repo anchor -- weaker, trust-on-first-use (set SUTRA_VENDOR_KEY_HOME to the operator's off-repo canonical key home for a stronger root)"
                 break
             fi
         done
         if [ -n "$_sutra_signed_tag" ]; then
-            echo "vendor: canonical HEAD ($_sutra_head) covered by signed tag $_sutra_signed_tag"
+            echo "vendor: canonical HEAD ($_sutra_head) covered by signed tag" \
+                 "$_sutra_signed_tag ($_sutra_verify_label)"
         elif [ "${SUTRA_VENDOR_ALLOW_UNSIGNED:-}" = "1" ]; then
             echo "vendor: WARNING -- canonical HEAD ($_sutra_head) has no signed" \
                  "tag covering it (SUTRA_VENDOR_ALLOW_UNSIGNED=1, vendoring anyway" \

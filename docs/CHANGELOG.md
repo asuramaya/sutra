@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.14.1 — vendor.sh prefers an off-repo key home over the in-repo anchor (2026-08-05)
+
+Second, smaller part of msg 3775 via Alfred, ranked below 0.14.0 and
+landed after it so it wouldn't delay the release machinery.
+
+The gap: 0.13.0's `vendor.sh` guard verifies against `$SRC/packaging/
+release-signing/allowed_signers` — the anchor INSIDE the repo it's
+validating. That's trust-on-first-use: it catches a LATER compromise if
+you already hold a known-good copy, but an attacker who owns the repo can
+replace the anchor with their own key AND sign a tag with that key, and
+`verify-tag` passes.
+
+- **`SUTRA_VENDOR_KEY_HOME`** (new, opt-in, unset by default): a directory
+  of `*.pub` files living OFF-REPO — never committed, a CI runner can
+  never reach it. When set and populated, tried FIRST against each
+  candidate tag; only falls through to the in-repo anchor if it's unset,
+  the directory is empty/absent, or none of its keys verify. Verifying
+  against it is strictly stronger, since the root then sits outside
+  anything a repo compromise can touch.
+- **Nothing asuramaya-specific, still.** sutra names no default path —
+  checked mudra's own `src/bin/mudra` source directly rather than
+  guessing: its `MUDRA_KEY_HOME` default is `~/.ssh/mudra-master`,
+  per-operator-configurable (`key_home` in its own config or the env var),
+  never a hardcoded `asuramaya-*` path anywhere. Mirrors that SHAPE
+  without coupling to it by NAME — sutra has no reason to know mudra's
+  env var exists, and hardcoding this operator's actual configured value
+  would have violated the same "nothing asuramaya-specific" constraint
+  0.13.0 already committed to.
+- **Labeled honestly in the output either way**, per Alfred's explicit
+  ask: a successful verify prints which root it came from — `"off-repo
+  key home (...) -- strong root"` or `"in-repo anchor -- weaker,
+  trust-on-first-use (set SUTRA_VENDOR_KEY_HOME ...)"` — so a maintainer
+  watching `make vendor` output sees the weaker path every time it's
+  actually the one that fired, not just in documentation.
+- **`tests/signing_smoke.sh` extended** (not a new file — same fixture
+  discipline as 0.13.0's suite): a tag signed by a key that exists ONLY in
+  a fixture key-home directory verifies via that root; unsetting the env
+  var falls back to a completely different in-repo-armed key on the same
+  canonical; a key-home directory pointed at an UNRELATED key still
+  refuses when nothing else covers HEAD (the negative control for this
+  path specifically, not a reuse of 0.13.0's). Verified the new section
+  has teeth the same way as before: force-disabled the key-home branch,
+  confirmed the suite goes red on exactly that assertion, restored,
+  confirmed green.
+- **A real bug caught before it shipped, again by running it rather than
+  reading it**: the first draft built `_sutra_verify_label`'s weaker-path
+  message as `var="a" \` followed by continuation lines of bare quoted
+  strings — valid bash syntax, but NOT string concatenation; on the
+  fallback path it would have tried to EXECUTE the second line as a
+  command (`"SUTRA_VENDOR_KEY_HOME to the operator's..."`), fail with
+  "command not found", and never actually set the intended label. `bash
+  -n` passed on it — a syntax check that can't see a semantically wrong
+  but valid parse. Caught by testing the exact fallback branch it lived
+  in, not by re-reading the diff. Fixed as one plain quoted string.
+
+No vendored `.py`/`.js` module's own bytes changed — `vendor.sh` and
+`tests/signing_smoke.sh` only, neither carrying a per-file version
+constant. Root row count unchanged at 15. `make check` green. Did not cut
+a tag.
+
 ## 0.14.0 — sutra becomes releasable: signed source tarball on tag push (2026-08-05)
 
 Operator ruling, 2026-08-05 (msg 3775 via Alfred): supersedes
