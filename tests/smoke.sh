@@ -105,17 +105,29 @@ PY
 # Only meaningful when canonical itself is clean and committed (vendor.sh
 # refuses to run otherwise); skipped rather than failed when it isn't, since
 # a dirty dev tree mid-edit is a normal state for this repo, not a bug.
+# SUTRA_VENDOR_ALLOW_UNSIGNED=1: canonical HEAD is armed but not yet
+# tag-signed (arm-before-tag — the tag is the operator's own act, never
+# CI's), so vendor.sh's unsigned-tag guard would otherwise abort this
+# self-check every commit until the first real signed tag lands. Same
+# escape hatch vendor.sh documents for an untagged dev fix; this call
+# still asserts the anchors get written and match HEAD, it just doesn't
+# require a signature that can't exist yet.
 VD="$RD/vendor-test"
 mkdir -p "$VD"
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 && \
    [ -z "$(git -C "$ROOT" status --porcelain -- sutra.py sutra_update.py \
        sutra_xen.py pill.js)" ]; then
-    bash "$ROOT/vendor.sh" "$VD" >/dev/null
+    SUTRA_VENDOR_ALLOW_UNSIGNED=1 bash "$ROOT/vendor.sh" "$VD" >/dev/null
     head_commit=$(git -C "$ROOT" rev-parse HEAD)
     for f in sutra sutra_update sutra_xen; do
         [ -s "$VD/$f.version" ] || { echo "SMOKE FAIL: vendor.sh didn't write $f.version"; exit 1; }
         [ -s "$VD/$f.commit" ] || { echo "SMOKE FAIL: vendor.sh didn't write $f.commit"; exit 1; }
-        got="$(cat "$VD/$f.commit")"
+        # First line only: a second "unsigned" line is expected whenever
+        # HEAD outruns the latest signed tag (the normal dev state, and
+        # unconditionally true right after arming, before any tag exists
+        # yet) -- this check is about LAG/DRIFT commit identity, not about
+        # whether HEAD happens to be tag-covered at test time.
+        got="$(head -n1 "$VD/$f.commit")"
         [ "$got" = "$head_commit" ] || {
             echo "SMOKE FAIL: $f.commit ($got) != canonical HEAD ($head_commit)"; exit 1; }
     done
