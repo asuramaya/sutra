@@ -22,8 +22,9 @@ packaging/         VERSION -- the repo's own release counter
 tests/             unit.py, unit_update.py, unit_xen.py, attack_socket.py (adversarial
                     fuzz), check_version.sh, smoke.sh, toy_daemon.py (a whole tiny pill
                     built on sutra, the reference example for consumers)
-.github/           ci.yml, and the three community files (CODE_OF_CONDUCT.md,
-                    CONTRIBUTING.md, SECURITY.md)
+.github/           ci.yml, release.yml (0.13.0 -- signed source tarball on tag
+                    push, see docs/RELEASING.md), and the three community
+                    files (CODE_OF_CONDUCT.md, CONTRIBUTING.md, SECURITY.md)
 ```
 
 ## Conventions worth knowing before you edit
@@ -70,18 +71,23 @@ marker for the LAG-vs-DRIFT read ("is this copy at or after the file's own
 last commit"). Neither one was ever an authenticity claim, and neither needs
 a signed commit to do its job — authenticity, when it matters, belongs at the
 tag/release boundary, which is where the FAMILY's sealing ritual lives (see
-any sealed pill's own `docs/RELEASING.md`). sutra itself has no *release*
-boundary — see `docs/RELEASING.md` and the exemptions table below for why —
-but it now has a narrower one of its own (0.13.0, msg 3744 via Alfred):
-`vendor.sh` refuses to copy an unattested canonical state, checking whether
-a tag containing HEAD verifies against `packaging/release-signing/
-allowed_signers`. This is a VENDORING-PROVENANCE checkpoint, not a release —
-no `.deb`, no tarball, no GitHub release, no `release.yml`; the tag exists
-solely to answer "did a human holding the key approve copying this state
-into six pills," nothing about a packaged artifact. It closes the gap
-*upstream* of the pill's own release signature, which remains the
-user-facing control — see `sutra.mk`'s own `check-sutra` comment for what
-this explicitly does and does not cover.
+any sealed pill's own `docs/RELEASING.md`). sutra now has that boundary too
+(operator ruling 2026-08-05, `docs/RELEASING.md`) — a signed source
+tarball + `SHA256SUMS` on tag push, never a `.deb`, since nothing imports
+sutra at runtime and the consumption model stays vendoring.
+
+sutra actually carries **two** signing checkpoints, easy to conflate: a
+**tag** checkpoint (0.13.0, msg 3744 via Alfred) — `vendor.sh` refuses to
+copy an unattested canonical state, checking whether a tag containing HEAD
+verifies against `packaging/release-signing/allowed_signers` — and the
+**tarball/release** checkpoint above. The tag checkpoint serves *vendoring*
+consumers (the six pills, at every re-vendor, gated on holding a canonical
+checkout); the tarball checkpoint serves *tarball* consumers (third
+parties and forks who never vendor at all). Same key, same anchor, two
+different questions — "is the state I'm copying approved" vs. "is the
+archive I downloaded approved." See `sutra.mk`'s own `check-sutra` comment
+for what the tag checkpoint explicitly does and does not cover, and
+`docs/RELEASING.md` for the full release procedure.
 
 ## Standard exemptions
 
@@ -95,4 +101,4 @@ this table is a bug, not a choice.
 | no `install.sh` / `uninstall.sh` | sutra has no standalone install — it ships no daemon, CLI, or extension of its own to put on a machine. It is consumed only by copying (`make vendor`, i.e. `vendor.sh`) into another pill's tree; there is no "front door" here to write one for. |
 | no `src/`, no man page | follows from the row above — there is no CLI surface here to organize under `src/bin`/`src/data`/`src/extension` or to document with a man page. |
 | per-file version constants (`SUTRA_VERSION`, `SUTRA_UPDATE_VERSION`, `SUTRA_XEN_VERSION`, `PILL_JS_VERSION`) exist alongside `packaging/VERSION` | deliberate, ruled, and mechanically enforced (`make check-version`, `tests/check_version.sh`) — not the drift the family's single-version-constant rule exists to catch. `packaging/VERSION` is the repo's own release counter; each vendored file's constant tracks that file's own content history independently, because pills vendor and freshness-check each file on its own timeline, not the whole repo's at once. See `.github/CONTRIBUTING.md` and `docs/BOOTSTRAP.md`. |
-| no `.github/workflows/release.yml`, and there will not be one | Structural, not a gate waiting to lift: `~/code/REPOS/RELEASE.md:201` (the family's ratified cross-repo release doctrine) rules sutra `n/a (vendored, not released alone) ... its integrity story is the vendor hash chain`. sutra ships no daemon, CLI, or extension of its own (see the "no `install.sh`/`uninstall.sh`" row above) — no standalone artifact for a `.deb`+tarball release to attach to. Every consumer already receives sutra's bytes via `vendor.sh`'s per-file sha256 anchor, verified continuously by every consuming pill's own `check-sutra`, a stronger guarantee than a repo-level signature checked once at download. See `docs/RELEASING.md`. (Corrected 2026-08-01: an earlier version of this row cited the sutra/mudra CONVERGENCE TIMING gate as the reason, implying release machinery would arrive once that gate lifted — it doesn't; conflating a timing gate with a structural ruling nearly produced release machinery for a repo RELEASE.md itself already exempts.) |
+| release artifact is a source tarball only, never a `.deb` | Not an exemption from the family standard so much as a deliberate departure from it (operator ruling 2026-08-05, `docs/RELEASING.md`): sutra ships no daemon, CLI, or extension of its own (see the "no `install.sh`/`uninstall.sh`" row above), so there is no standalone runtime artifact for a `.deb` to install — a `.deb` would imply an installed library no pill links against and would re-open the co-installation class ruling `3e44bd95` closed. `.github/workflows/release.yml` builds and publishes `sutra.tar.gz` + `SHA256SUMS` on tag push; see `docs/RELEASING.md` for the full procedure and for why this was `n/a` until 2026-08-05. |

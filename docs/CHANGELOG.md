@@ -1,5 +1,85 @@
 # Changelog
 
+## 0.14.0 — sutra becomes releasable: signed source tarball on tag push (2026-08-05)
+
+Operator ruling, 2026-08-05 (msg 3775 via Alfred): supersedes
+`RELEASE.md:201`'s former "n/a (vendored, not released alone)". sutra IS
+released now, and it is NOT a runtime dependency of any pill — both facts
+hold simultaneously. The gap this closes: third parties and forks building
+their own pill had no verifiable way to know they held the intended
+source. `<file>.version`'s sha256 proves a vendored copy MATCHES a
+checkout, never that the checkout was ever INTENDED — that's a different
+gap than 0.13.0's, which serves *vendoring* consumers (the six pills) and
+is untouched by this.
+
+- **The artifact is a signed source tarball + `SHA256SUMS`, never a
+  `.deb`.** Nothing imports sutra at runtime, the consumption model stays
+  vendoring, and a `.deb` would imply an installed library no pill links
+  against — ruling `3e44bd95`'s co-installation fix (every pill's own
+  private `<prefix>/share/<pill>/lib/`) stands untouched. The six pills
+  keep vendoring byte-identical copies and gain no `Depends:`.
+- **`make dist`** (new): `git archive --format=tar.gz --prefix=sutra/` +
+  `sha256sum` into `dist/sutra.tar.gz` + `dist/SHA256SUMS`. `--prefix=
+  sutra/` so every tarball extracts to exactly one named directory, never
+  bare into the caller's CWD — the family's known repeat tarbomb defect
+  (`RELEASE.md` still lists a `--prefix=kast/` fix as owed on kast, and
+  byebyte's `release.yml` carried a stale `--prefix=ByeByte/` until this
+  week's rename sweep). Verified by actually extracting into an empty
+  directory, not by reading the flag: exactly one `sutra/` entry, checksum
+  confirmed with `sha256sum -c`. `.gitattributes`' pre-existing
+  `export-ignore` scoping (this repo converged it during 0.12.0) already
+  keeps `tests/`, this `Makefile`, `.github/workflows`, `.gitattributes`,
+  `.gitignore` out — a fork building their own pill needs `vendor.sh`/
+  `sutra.mk`/the product files/docs, never sutra's own dev tooling. No
+  changes needed there.
+- **`.github/workflows/release.yml`** (new): fires on `push: tags: ['v*']`.
+  Modeled on mudra's release.yml (same tarball-only shape, no deb to
+  build), taking the tarball/`SHA256SUMS`/prefix parts from phanspeed
+  (`RELEASE.md`'s marked reference shape) and leaving the deb behind.
+  Verifies the tag matches `packaging/VERSION`; refuses outright if
+  `packaging/release-signing/allowed_signers` is empty or absent AT TAG
+  TIME (ported verbatim from mudra's identical guard — a tag's tree is
+  exactly what `git archive` ships, so an unarmed anchor at tag time ships
+  a permanently empty one, forever, since a sealed release is never
+  re-cut); re-verifies the tarball is tarbomb-free inside the workflow
+  itself, not just locally; pulls release notes from `docs/CHANGELOG.md`'s
+  matching section, never `--generate-notes`; publishes an **unsigned**
+  GitHub release (`sutra.tar.gz` + `SHA256SUMS`) — no secret or hardware
+  key ever lives in Actions, same reasoning as every other sealed repo in
+  the family. The operator signs `SHA256SUMS` by hand, offline, uploads
+  the detached signature after.
+- **Two signing surfaces, documented as two, not conflated into one**: the
+  0.13.0 tag checkpoint (`vendor.sh`'s `verify-tag` against
+  `allowed_signers`) serves vendoring consumers; the new tarball
+  checkpoint serves tarball consumers who never vendor. Same key, same
+  anchor, different questions — "is the state I'm copying approved" vs.
+  "is the archive I downloaded approved." Both `docs/RELEASING.md` and
+  `docs/ARCHITECTURE.md`'s "Commit signing" section now say so explicitly,
+  with a table in the former.
+- **`docs/RELEASING.md` fully rewritten**, not patched — the prior
+  document's entire premise ("sutra does not cut its own release") was the
+  thing reversed. Keeps the prior near-miss history (msg 2866/2877/2884)
+  as a "History" section, since the reasoning that produced the reversal
+  matters more than the old conclusion, and states plainly that a release
+  is a promise: API stability and deprecation notice are owed from here
+  on, and sutra's 0.9.0→0.13.0-in-days cadence has to slow or be
+  explicitly declared unstable — raised, not resolved, by this entry.
+- **`docs/ARCHITECTURE.md`** updated: the "Commit signing" section no
+  longer says sutra has no release boundary; the exemptions table's "no
+  `release.yml`, and there will not be one" row is removed (it was
+  structural, and the structure changed) and replaced with a row stating
+  the actual departure — tarball-only, never a `.deb`, and why.
+- **`.gitignore`** gained `dist/` (build output, matching phanspeed's own
+  convention).
+
+No vendored `.py`/`.js` module's own bytes changed — this touches
+`Makefile`, `.github/workflows/release.yml`, `docs/RELEASING.md`,
+`docs/ARCHITECTURE.md`, `.gitignore` only, none carrying a per-file
+version constant. Root row count unchanged at 15 (`release.yml` lands
+inside the existing `.github` row). `make check` green. Did not cut a
+tag — the operator's key is the only thing that signs, and the tag is
+their touch; this lands the machinery the tag will trigger, nothing more.
+
 ## 0.13.0 — vendor.sh refuses an unattested commit; check-sutra reports provenance (2026-08-05)
 
 The supply-chain gap found while designing the update service (msg 3744

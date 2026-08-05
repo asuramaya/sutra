@@ -1,5 +1,5 @@
 # sutra — the shared pill backbone
-.PHONY: smoke attack check-version check-repo check-signing check vendor
+.PHONY: smoke attack check-version check-repo check-signing check vendor dist clean
 
 smoke:
 	bash tests/smoke.sh
@@ -87,3 +87,41 @@ check: smoke attack check-version check-repo check-signing
 vendor:
 	@[ -n "$(DEST)" ] || { echo "usage: make vendor DEST=<pill>/share/<pill>/lib [EXT=<ext-dir>] [BOOTSTRAP=<pill-name>]"; exit 1; }
 	bash vendor.sh "$(DEST)" $(if $(EXT),"$(EXT)") $(if $(BOOTSTRAP),--bootstrap="$(BOOTSTRAP)")
+
+# --- dist: the release tarball + SHA256SUMS (operator ruling 2026-08-05,
+# RELEASE.md's "sutra's posture" subsection) -------------------------------
+#
+# sutra IS released now, but ships ONLY a signed source tarball, never a
+# .deb: nothing imports sutra at runtime, the consumption model is
+# vendoring, and a .deb would imply an installed library no pill links
+# against -- ruling 3e44bd95's co-installation fix (every pill's own
+# private <prefix>/share/<pill>/lib/) stands untouched by this. The six
+# pills keep vendoring byte-identical copies and gain no Depends:.
+#
+# --prefix=sutra/: every tarball extracts to exactly one named directory,
+# never bare into the caller's CWD -- the family's known repeat tarbomb
+# defect (RELEASE.md still lists a --prefix=kast/ fix as owed on kast, and
+# byebyte's release.yml carried a stale --prefix=ByeByte/ until this
+# week's rename sweep). Verify by actually extracting into an empty dir,
+# not by reading the flag -- `make dist && mkdir -p /tmp/x && tar -xzf
+# dist/sutra.tar.gz -C /tmp/x && ls /tmp/x` should show exactly one
+# `sutra/` directory.
+#
+# .gitattributes' export-ignore keeps CI/dev files (tests/, this Makefile,
+# .github/workflows, .gitattributes, .gitignore) out of what `git archive`
+# ships -- a fork building their own pill needs vendor.sh/sutra.mk/the
+# product files/docs, never sutra's own dev tooling.
+DIST_DIR := dist
+SUTRA_TARBALL := $(DIST_DIR)/sutra.tar.gz
+
+dist:
+	@mkdir -p $(DIST_DIR)
+	git archive --format=tar.gz --prefix=sutra/ -o $(SUTRA_TARBALL) HEAD
+	( cd $(DIST_DIR) && sha256sum sutra.tar.gz > SHA256SUMS )
+	@echo "--- contents ---"
+	@tar -tzf $(SUTRA_TARBALL)
+	@echo "--- manifest ---"
+	@cat $(DIST_DIR)/SHA256SUMS
+
+clean:
+	rm -rf $(DIST_DIR)

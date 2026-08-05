@@ -1,0 +1,109 @@
+name: release
+# sutra IS released (operator ruling 2026-08-05, ~/code/REPOS/RELEASE.md's
+# "sutra's posture" subsection) but ships ONLY a signed source tarball,
+# never a .deb -- nothing imports sutra at runtime, the consumption model
+# is vendoring, and a .deb would imply an installed library no pill links
+# against (ruling 3e44bd95's co-installation fix stands untouched). The
+# six pills keep vendoring byte-identical copies and gain no Depends:.
+# Modeled on mudra's release.yml (same tarball-only shape, no deb to
+# build), taking the tarball/SHA256SUMS/prefix parts from phanspeed
+# (RELEASE.md's marked reference shape) and leaving the deb behind.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify tag matches packaging/VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file="$(tr -d '[:space:]' < packaging/VERSION)"
+          echo "tag=${tag} VERSION=${file}"
+          if [ "${tag}" != "${file}" ]; then
+            echo "::error::tag ${tag} does not match packaging/VERSION ${file}"
+            exit 1
+          fi
+
+      - name: Refuse to tag while the signing anchor is empty
+        run: |
+          # A tag's tree is exactly what `git archive` ships in the tarball
+          # below -- if packaging/release-signing/allowed_signers is empty
+          # (or absent) AT TAG TIME, the tarball ships a permanently empty
+          # anchor, forever, because a sealed release is never re-cut. Arming
+          # must happen BEFORE the tag that ships it, never after (arm-before-
+          # tag, unchanged -- msg 3775). Ported from mudra's identical guard;
+          # gestalt hit this exact drafting mistake independently (Fulcrum,
+          # msg 2910) before mudra's own fix existed.
+          if [ ! -s packaging/release-signing/allowed_signers ]; then
+            echo "::error::packaging/release-signing/allowed_signers is empty or absent at" \
+                 "this tag. Arming (vajra's sync-signers, at the operator's own hand) must" \
+                 "happen BEFORE tagging, never after. Delete this tag, arm, re-tag."
+            exit 1
+          fi
+
+      - name: Build release tarball (make dist)
+        run: |
+          make dist
+          echo "--- extraction hygiene: prove no tarbomb, don't just read the flag ---"
+          rm -rf /tmp/sutra-extract-check
+          mkdir -p /tmp/sutra-extract-check
+          tar -xzf dist/sutra.tar.gz -C /tmp/sutra-extract-check
+          entries="$(ls /tmp/sutra-extract-check | wc -l)"
+          if [ "$entries" -ne 1 ] || [ ! -d /tmp/sutra-extract-check/sutra ]; then
+            echo "::error::tarball did not extract to exactly one sutra/ directory -- tarbomb"
+            ls -la /tmp/sutra-extract-check
+            exit 1
+          fi
+          echo "ok: extracts to exactly one sutra/ directory"
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          # Format-agnostic: grabs the section starting at the first `## `
+          # heading whose text contains the tag's version, up to (not
+          # including) the next `## ` heading. Never --generate-notes: a
+          # human wrote this entry and a commit dump is not release notes --
+          # refuse the release if the section is missing rather than
+          # falling back quietly.
+          ver="${GITHUB_REF_NAME#v}"
+          awk -v v="$ver" 'BEGIN{f=0} /^## / { if(f) exit; if(index($0,v)){f=1;print;next} } f{print}' docs/CHANGELOG.md > RELEASE_NOTES.md
+          echo "--- extracted release notes ($(wc -l < RELEASE_NOTES.md) lines) ---"
+          cat RELEASE_NOTES.md
+          if [ "$(wc -l < RELEASE_NOTES.md)" -lt 2 ]; then
+            echo "::error::no docs/CHANGELOG.md section for ${ver}; add one before tagging"
+            exit 1
+          fi
+
+      # No signing step here, deliberately: vendoring consumers trust the
+      # signed TAG (vendor.sh verify-tag against allowed_signers, sutra
+      # 0.13.0); tarball consumers trust a signature over these exact
+      # published bytes -- same key, same ceremony, same reason it can't
+      # live in this workflow: a secret/hardware key in Actions secrets
+      # would let anyone who compromises the account or the workflow sign
+      # whatever they just pushed, defeating the entire scheme. The release
+      # ships UNSIGNED from here; the operator signs SHA256SUMS BY HAND,
+      # offline, with the physical FIDO2 key, and runs
+      # `gh release upload <tag> SHA256SUMS.sig --clobber` after.
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Idempotent: if the release was already created by hand (e.g. with
+          # release notes written ahead of the tag push), attach/replace the
+          # build assets on it instead of failing on "tag already exists".
+          assets=(dist/sutra.tar.gz dist/SHA256SUMS)
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+              --title "sutra ${GITHUB_REF_NAME}" \
+              --notes-file RELEASE_NOTES.md
+          fi
