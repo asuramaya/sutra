@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.14.2 — signature checks no longer confuse "couldn't verify" with "unsigned" (2026-08-15)
+
+Alfred's cross-house audit (msg 4573), against practice 2c45d78e / parent
+principle 4f1727ae ("a monitor must not be able to lie in the comfortable
+direction") / 60bc15db ("a function that cannot distinguish no from I
+don't know, and reports no"). sutra isn't a monitor, so the audit was
+reframed as two questions: does sutra's own API make the honest thing
+easy or the comfortable thing easy, and does the same pass on sutra's own
+signing verbs hold up.
+
+**The bug, reproduced before it was fixed, not assumed:** `git verify-tag`
+with `gpg.format=ssh` shells out to `ssh-keygen` internally. Neither
+`vendor.sh`'s guard nor `check-sutra`'s live provenance check verified
+`ssh-keygen` was even present before relying on `verify-tag`'s exit code.
+With a genuinely, validly signed tag (confirmed first WITH `ssh-keygen`
+present, so the fixture wasn't a strawman) and `ssh-keygen` missing from
+`PATH`, `vendor.sh` read "canonical HEAD has no signed tag covering it.
+Tag and sign it first" — a confident, false claim about the state of the
+world standing in for "we could not check." `check-sutra` had the
+matching bug: "provenance WARN ... not reachable from any signed tag,"
+same false confidence.
+
+- **`vendor.sh`**: an upfront `command -v ssh-keygen` check, inside the
+  same block that gates on the anchor/key-home actually being armed
+  (nothing to verify, nothing to check for, when neither is). Missing
+  `ssh-keygen` is now an unconditional hard stop with a distinct message
+  — deliberately NOT bypassable via `SUTRA_VENDOR_ALLOW_UNSIGNED=1`, since
+  that flag documents an informed choice to vendor an untagged commit, not
+  a broken toolchain standing in for one; silently treating "couldn't
+  check" as "confirmed unsigned, bypass granted" would be the same lie one
+  step removed.
+- **`check-sutra`**: the live provenance check now reports "provenance
+  unknown ... ssh-keygen not available" rather than falling through to the
+  loop and reporting "not reachable" when nothing could actually be
+  checked. Still never a FAIL — same graduated UNKNOWN/warn/ok shape,
+  `ssh-keygen` missing just joins "canonical anchor not armed yet" as a
+  second real reason to land in unknown rather than a false warn.
+- **`tests/signing_smoke.sh` extended**, same fixture discipline: a tag
+  genuinely, validly signed by the currently-armed key (checked WITH
+  `ssh-keygen` present first, to prove the fixture is real), then the
+  identical fixture re-run in an isolated environment (`env -i`) with
+  `ssh-keygen` excluded from `PATH`. Confirmed the bug reproduces on the
+  pre-fix code — the exact same fixture read "no signed tag covering it"
+  before the fix landed — then confirmed the fix changes the message to
+  "CANNOT VERIFY"/"provenance unknown" without changing the outcome
+  (still fail-closed) for the same fixture. Verified the new section has
+  teeth: reverted the fix, confirmed the suite goes red on exactly this
+  case, restored, confirmed green.
+- **Audited the rest of sutra's public API for the same defect-factory
+  pattern** (question 1: does any helper return a bool where the
+  underlying fact has three states) and found nothing else to fix:
+  `sutra.py`'s `check_health()` and `sutra_update.py`'s `verify_dir()`
+  already pair every boolean with a distinguishing reason string, the
+  same standard the signing paths hadn't been held to until now;
+  `sutra_xen.py`'s `virt_type()` collapses "no known virtualization
+  signal fired" to `"none"`, but its own docstring already states the
+  fallback path only ever detects Xen by design (the one hypervisor this
+  family's guest seam cares about) — a documented scope limit, not a
+  masked failure mode. No convention needed beyond what already exists;
+  the gap was the signing paths not yet meeting it.
+
+No vendored `.py`/`.js` module's own bytes changed — `vendor.sh` and
+`sutra.mk` only, neither carrying a per-file version constant. Root row
+count unchanged at 15. `make check` green. Did not cut a tag.
+
 ## 0.14.1 — vendor.sh prefers an off-repo key home over the in-repo anchor (2026-08-05)
 
 Second, smaller part of msg 3775 via Alfred, ranked below 0.14.0 and

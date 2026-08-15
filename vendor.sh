@@ -164,6 +164,34 @@ if git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         done
     fi
     if [ -s "$_sutra_anchor" ] || [ -n "$_sutra_kh_anchor" ]; then
+        # HONESTY CHECK BEFORE THE TRUST CHECK (msg 4573 via Alfred, the
+        # "does sutra report NO when the truth is COULDN'T-TELL" audit):
+        # `git verify-tag` with gpg.format=ssh shells out to ssh-keygen
+        # internally. Missing ssh-keygen makes EVERY verify-tag call in the
+        # loop below fail identically to "not signed by an allowed key" --
+        # reproduced: a genuinely, validly signed tag, verified fine with
+        # ssh-keygen present, reads as "canonical HEAD has no signed tag
+        # covering it. Tag and sign it first" the moment ssh-keygen is
+        # missing from PATH. That is a confident false claim about the
+        # WORLD (no valid signature exists) standing in for "we could not
+        # check" -- exactly the comfortable-direction lie ruling 4f1727ae
+        # names, and sutra_update.py's own verify_dir() already refuses to
+        # make this mistake (shutil.which("ssh-keygen") gets its own
+        # distinct "armed but ssh-keygen missing" reason, never folded into
+        # "signature verification FAILED"). Brought up to the same standard
+        # here. Hard stop, UNCONDITIONAL -- SUTRA_VENDOR_ALLOW_UNSIGNED=1
+        # documents an informed choice to vendor a commit KNOWN to be
+        # untagged; it says nothing about a broken toolchain, and silently
+        # treating "couldn't check" as "confirmed unsigned, bypass granted"
+        # would be the same lie one step removed.
+        if ! command -v ssh-keygen >/dev/null 2>&1; then
+            echo "vendor: CANNOT VERIFY -- ssh-keygen not found, so no tag" \
+                 "signature could be checked. This is UNKNOWN, not confirmed-" \
+                 "unsigned -- install ssh-keygen and retry. SUTRA_VENDOR_ALLOW_UNSIGNED=1" \
+                 "does not apply here: it documents choosing to vendor an" \
+                 "untagged commit, not a broken toolchain standing in for one." >&2
+            exit 1
+        fi
         _sutra_head="$(git -C "$SRC" rev-parse HEAD)"
         _sutra_signed_tag=""
         _sutra_verify_label=""

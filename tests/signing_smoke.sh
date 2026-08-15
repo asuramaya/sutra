@@ -212,6 +212,60 @@ else
     say "vendor.sh: SUTRA_VENDOR_KEY_HOME negative control ok -- an unrelated off-repo key does not satisfy the guard either"
 fi
 
+# --- 9. HONESTY CHECK: ssh-keygen missing must report CANNOT-VERIFY /
+# UNKNOWN, never a confident "not signed"/"not reachable" (msg 4573 via
+# Alfred: a monitor must not report a confident NO when the truth is
+# COULDN'T-TELL). git verify-tag with gpg.format=ssh shells out to
+# ssh-keygen internally -- without it, a genuinely, validly signed tag
+# fails identically to an actually-unsigned one. Reproduced BEFORE fixing
+# (bash -x against the pre-fix vendor.sh, by hand, off this suite): the
+# same fixture below read "canonical HEAD has no signed tag covering it.
+# Tag and sign it first" for a tag that was, in fact, already correctly
+# signed -- proving this isn't a strawman before the fix landed. -----------
+mkdir -p "$T/noskg"
+for b in bash sh git awk sed cat grep sha256sum tr cut mktemp printf true false \
+         dirname pwd basename ls rm mkdir head make; do
+    p=$(command -v "$b" 2>/dev/null) && ln -sf "$p" "$T/noskg/$b"
+done
+( cd "$T/canon" && echo "# ssh-keygen honesty probe" >> sutra.py && git add -A \
+  && git commit -qm "probe commit" \
+  && git -c gpg.format=ssh -c user.signingkey="$T/inrepo2/id_ir" tag -s v0.0.5 -m "genuinely signed" )
+# Ground truth, checked WITH ssh-keygen present -- the fixture must be
+# real before it's used to prove anything about its absence.
+if ! ( cd "$T/canon" && git -c gpg.format=ssh \
+       -c gpg.ssh.allowedSignersFile=packaging/release-signing/allowed_signers \
+       verify-tag v0.0.5 ) >/dev/null 2>&1; then
+    die "ssh-keygen honesty fixture is broken -- v0.0.5 should verify cleanly with ssh-keygen present"
+fi
+rm -rf "$T/dest9"; mkdir -p "$T/dest9"
+out=$( cd "$T/canon" && env -i PATH="$T/noskg" HOME="$HOME" bash vendor.sh "$T/dest9" 2>&1 )
+rc=$?
+if [ "$rc" -ne 0 ] && echo "$out" | grep -q "CANNOT VERIFY"; then
+    say "vendor.sh: ssh-keygen-missing ok -- reports CANNOT VERIFY (unknown), not a false 'no signed tag'"
+else
+    die "vendor.sh did not distinguish ssh-keygen-missing from unsigned:"$'\n'"$out"
+fi
+if echo "$out" | grep -qi "no signed tag covering"; then
+    die "vendor.sh's ssh-keygen-missing message still claims 'no signed tag covering it' -- the honesty bug is back"
+fi
+
+# Same check for check-sutra's live provenance line: vendor a fresh,
+# genuinely-signed copy (ssh-keygen present), then re-run check-sutra with
+# ssh-keygen unavailable and confirm it reads "provenance unknown", not
+# "provenance WARN ... not reachable".
+rm -rf "$T/dest9b"; mkdir -p "$T/dest9b"
+( cd "$T/canon" && bash vendor.sh "$T/dest9b" ) >/dev/null 2>&1
+cp "$T/dest9b"/* "$T/pill/lib/"
+out=$( cd "$T/pill" && env -i PATH="$T/noskg" HOME="$HOME" make check-sutra "_SUTRA_CANON=$T/canon" 2>&1 )
+if echo "$out" | grep -q "provenance unknown.*ssh-keygen not available"; then
+    say "check-sutra: ssh-keygen-missing ok -- reports provenance unknown, not a false 'not reachable'"
+else
+    die "check-sutra did not distinguish ssh-keygen-missing from unreachable:"$'\n'"$out"
+fi
+if echo "$out" | grep -q "not reachable from any signed tag"; then
+    die "check-sutra's ssh-keygen-missing case still claims 'not reachable from any signed tag'"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
     echo "SIGNING SMOKE OK"
 else
