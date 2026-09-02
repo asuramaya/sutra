@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.14.3 — per-file version constants get a comment pointing at the right tool (2026-09-02)
+
+Alfred XVI (msg 6426/6432): grepped `SUTRA_VERSION` while auditing family-
+wide sutra lag, got `"0.3.2"` against `packaging/VERSION`'s `0.14.2`, and
+read that as "sutra.py is four minor versions behind its own package."
+Wrong — then byte-compared sutra.py against canonical and read "pills are
+current, the task is bogus." Also wrong. The truth needed the `.version`/
+`.commit` anchors `vendor.sh` writes, which are accurate and settled it:
+`sutra.py`/`sutra_xen.py`/`sutra_update.py`/`pill.js` are byte-identical
+in all five pills because none of them changed between 0.12.9 and 0.14.2
+— only `sutra.mk` actually lags. Two wrong readings before the right tool
+was consulted.
+
+**Not fixed by deriving `SUTRA_VERSION` from `packaging/VERSION`, or by
+making a release refuse when they disagree** — that was tried once
+already, the other direction, and reverted for a documented reason:
+`tests/check_version.sh`'s own header records a prior CI step that
+asserted `VERSION == SUTRA_VERSION`, correct before the per-file-version
+convention existed, wrong on every commit after it (red since 0.2.0,
+corrected in 0.7.5). `packaging/VERSION` is a repo-wide release counter;
+each per-file constant tracks that ONE file's own content history
+independently, because pills freshness-check each vendored file against
+its own last-modifying commit, never the whole repo's HEAD at once
+(`ARCHITECTURE.md`'s exemptions table, already ruled and mechanically
+enforced). `SUTRA_VERSION = "0.3.2"` was not lying — it was accurately
+reporting that `sutra.py`'s own bytes hadn't moved since `db9ec14`.
+Merging the two axes back together would undo that ruling for the second
+time, for the same reason it was wrong the first time.
+
+**What actually needed fixing: the constant answers a narrower question
+than a reader assumes, and nothing at the point of confusion said so.**
+A four-to-six-line comment now sits directly above each of the four
+per-file constants (`SUTRA_VERSION`, `SUTRA_XEN_VERSION`,
+`SUTRA_UPDATE_VERSION`, `PILL_JS_VERSION`): tracks this file's own bytes
+only, never `packaging/VERSION`; for real freshness, read the `.version`/
+`.commit` anchors or run `check-sutra`; never grep this line and compare
+it to the package version. Same fact the exemptions table already
+documented, moved to the exact place a future ad-hoc grep will land —
+discoverability, not a new rule.
+
+All four constants bumped (`0.3.2`→`0.3.3`, `0.1.2`→`0.1.3` ×2, `0.1.2`→
+`0.1.3`) since a comment still moves the file's own bytes, no carve-out,
+same rule `0.12.5` already established for "just a comment."
+`tests/check_version.sh` reverified green against the real committed
+diff, not assumed.
+
+**Widens the pending re-vendor scope from one file to five** (task #23,
+Alfred XVI): all five vendored product files now differ from what the
+five lagging pills carry, not only `sutra.mk`. Operationally identical —
+`vendor.sh` copies all five in one invocation regardless of how many
+changed — but worth stating plainly since the prior scope estimate
+(`sutra.mk` only) was correct as of 0.14.2 and is superseded by this
+entry, not by an error in that estimate.
+
+`make check` green. Did not cut a tag — the operator's key is the only
+thing that signs, and the tag remains theirs alone to place.
+
 ## 0.14.2 — signature checks no longer confuse "couldn't verify" with "unsigned" (2026-08-15)
 
 Alfred's cross-house audit (msg 4573), against practice 2c45d78e / parent
